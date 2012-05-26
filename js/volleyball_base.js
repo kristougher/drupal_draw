@@ -20,7 +20,6 @@ lines.push(
 lines.attr("stroke","#FFF");
 /**** court finished, creating palette ***/
 
-
 /***
 Attributes for the objects in the palette
 ***/
@@ -47,6 +46,12 @@ var attributes = {
 	
 		}
 }
+
+
+// If there is content in the 
+travLocal(JSON.parse($("#draw-diagram").next().find("textarea").text()));
+
+
 
 palette['player'] = paper.image("/boxofdrills/image_res/player.png", 450, 30, 25, 29);
 palette['player'].attr("title","player");
@@ -143,6 +148,39 @@ function drawFigure(type,no, attr){
     }
     
     return objectsArray[key].attr();
+}
+/***************
+* Get saved data 
+****************/
+function travLocal(existing_data){
+
+/*	$.ajax({
+		url: ajaxURL,
+		data: {op: 'retrieve'},
+		dataType: "json",
+		success:function(e){
+			
+		}
+	});
+	*/
+	for(var key in existing_data){
+	//$.each(existing_data,function(key,el){
+	console.log(key);
+	console.log(existing_data[key]);
+		drawFromJSON(key,existing_data[key]);
+		
+	}
+	// );
+}
+function drawFromJSON(key,jsonstr){
+  var it = 0;
+	var info = key.split("_");
+	var objTemp = jsonstr;
+	if(info[0].indexOf("Line") > -1) drawLine(info[0],it,objTemp);
+	else drawFigure(info[0],key,objTemp, false);
+	it++;
+	
+	
 }
 // The temp var. Frequently used below
 var temp;

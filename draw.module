@@ -18,8 +18,6 @@ function draw_field_widget_info(){
  * Implements hook_field_widget
  */
 function draw_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
-  dpm($items);
-  dpm($instance);
   $element['value']= array(
     '#type' => 'textarea', // hidden',
     '#prefix' => '<div id="draw-diagram"></div>',
@@ -51,7 +49,6 @@ function draw_field_formatter_view($object_type, $object, $field, $instance, $la
   return $element;
 }
 function draw_form_alter(&$form, &$form_state, $form_id){
-dpm($form);
   if ($form['#node_edit_form']) {
     $path = drupal_get_path('module', 'draw') . '/js/';
     drupal_add_js($path . 'raphael-min.js');
