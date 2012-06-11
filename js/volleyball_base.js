@@ -1,10 +1,10 @@
-var palette = new Array(), objectsArray = new Array(), elements = {};
+var palette = new Array(), objectsArray = new Array(), elements = {}, i = 0;
 (function ($) {
 
 $(document).ready(function(){
 /*** Draw the court and background ***/
 var paper = Raphael(document.getElementById("draw-diagram"), 500, 640);
-var i = 0;
+// var i = 0;
 var bg = paper.rect(0,0,400,640, 5);
 bg.attr("fill","#ddd");
 
@@ -26,11 +26,11 @@ Attributes for the objects in the palette
 var attributes = {
 	ballLine: { "stroke":"#222","stroke-dasharray":"-"},
 	movementLine: {"stroke":"#999","stroke-dasharray":"--"},
-	coach: function(no){ 
+	coach: function(no){
 		var src;
 		$.get(imagePath, {op:"image",image:"coach", no:no},function(data){
-			src = data; 
-			
+			src = data;
+
 		});
 			alert(JSON.stringify(src));
 			JSON.stringify(src)
@@ -40,15 +40,15 @@ var attributes = {
 			var src;
 		$.get(imagePath, {op:"image",image:"player", no:no},function(data){
 			src = {src:data};
-			
+
 		});
 			return src;
-	
+
 		}
 }
 
 
-// If there is content in the 
+// If there is content in the
 travLocal(JSON.parse($("#draw-diagram").next().find("textarea").text()));
 
 
@@ -73,7 +73,7 @@ toolbox.push(palette['coach'],palette['player']);
 
 if ($("#edit-field-diagram-und-0-value").val().length > 2) {
   var saved_drawing = JSON.parse($("#edit-field-diagram-und-0-value").val());
-  
+
   for(var element_title in saved_drawing) {
     drawFromJSON(element_title, saved_drawing[element_title]);
   }
@@ -87,20 +87,20 @@ if ($("#edit-field-diagram-und-0-value").val().length > 2) {
 function drawLine(objType,no,pData){
 	// Constructs an object ID
 	var objKey = objType + "_" + no;
-	
+
 	objectsArray[objKey] = new Array();
-	
+
 	// We need pData a lot, so it is abbreviated
 	var p = pData;
-	
-	// Constructs the first part of the SVG path-string p[0] is the starting coordinates. 
-	// The following 'C' is then shifted from array 
+
+	// Constructs the first part of the SVG path-string p[0] is the starting coordinates.
+	// The following 'C' is then shifted from array
 	var path = "M"+p[0][1]+" "+p[0][2]+p[1].shift();
-	
+
 	//var firstLineNo = p[1].shift();
-	// Adds the first coordinate. 
+	// Adds the first coordinate.
 	path = path+ p[1].shift(); //firstLineNo;
-	
+
 	for(var n in p[1]){
 		path = path+" "+p[1][n];
 	}
@@ -109,13 +109,13 @@ function drawLine(objType,no,pData){
 	var y2 = pData[1].pop();
 	var x2 = pData[1].pop();
 	objectsArray[objKey][1] = paper.circle(x,y, 7);
-	
+
 	objectsArray[objKey][0] = paper.path(path);
-	
+
 	objectsArray[objKey][0].attr(eval("attributes."+objType));
-	
+
 	objectsArray[objKey][1].attr("title",objKey).attr("fill","#F00");
-	
+
 //	if(objKey.indexOf("movement") > -1){
 	// det er en kurve
 	objectsArray[objKey][3] = paper.circle(x2,y2, 7);
@@ -130,7 +130,7 @@ function drawLine(objType,no,pData){
 	objectsArray[objKey][2].attr("opacity",0.2);
 
 	objectsArray[objKey][2].attr("title",objKey).attr("fill","#FFF");
-	
+
   return objectsArray[objKey][0].attr("path");
 
 }
@@ -146,11 +146,11 @@ function drawFigure(type,no, attr){
     	    objectsArray[key].attr({src:$("body").data("imagesrc")});
      	$("body").data("imagesrc","");
     }
-    
+
     return objectsArray[key].attr();
 }
 /***************
-* Get saved data 
+* Get saved data
 ****************/
 function travLocal(existing_data){
 
@@ -159,7 +159,7 @@ function travLocal(existing_data){
 		data: {op: 'retrieve'},
 		dataType: "json",
 		success:function(e){
-			
+
 		}
 	});
 	*/
@@ -168,19 +168,22 @@ function travLocal(existing_data){
 	console.log(key);
 	console.log(existing_data[key]);
 		drawFromJSON(key,existing_data[key]);
-		
+
 	}
 	// );
 }
 function drawFromJSON(key,jsonstr){
-  var it = 0;
 	var info = key.split("_");
-	var objTemp = jsonstr;
-	if(info[0].indexOf("Line") > -1) drawLine(info[0],it,objTemp);
-	else drawFigure(info[0],key,objTemp, false);
-	it++;
-	
-	
+	var objTemp = jsonstr, temp;
+	if(info[0].indexOf("Line") > -1){
+    temp = drawLine(info[0],i,objTemp);
+  }
+	else {
+    temp = drawFigure(info[0],i,objTemp, false);
+  }
+  elements[key] = temp;
+  saveLocal(elements);
+	i++;
 }
 // The temp var. Frequently used below
 var temp;
@@ -216,19 +219,19 @@ var pointStart = function () {
 },pointMove = function (dx, dy) {
     // move will be called with dx and dy
     this.attr({cx: (Math.round(this.ox) + dx), cy: (Math.round(this.oy) + dy)});
-    
+
     //gonna use the title quite a bit
 	var t = this.attr("title");
-    
+
     objectsArray[t][0].attr("path","M"+objectsArray[t][1].attr("cx")+" "+objectsArray[t][1].attr("cy")+"L"+objectsArray[t][2].attr("cx")+" "+objectsArray[t][2].attr("cy"));
 },
 pointMoveCurve = function (dx, dy) {
     // move will be called with dx and dy
     this.attr({cx: (Math.round(this.ox) + dx), cy: (Math.round(this.oy) + dy)});
-    
+
     //gonna use the title quite a bit
 	var t = this.attr("title");
-    
+
     objectsArray[t][0].attr("path","M"+objectsArray[t][1].attr("cx")+" "+objectsArray[t][1].attr("cy")+"C"+objectsArray[t][1].attr("cx")+" "+objectsArray[t][1].attr("cy")+" "+objectsArray[t][2].attr("cx")+" "+objectsArray[t][2].attr("cy")+" "+objectsArray[t][3].attr("cx")+" "+objectsArray[t][3].attr("cy"));
 },
 pointUp = function () {
@@ -247,14 +250,14 @@ var startOrig = function () {
 		 $("#imagelabel").val("");
 	     } else {
 		var label = i;
-		i++;     
+		i++;
 	     }
-	$("body").data("imagelabel",label);     
+	$("body").data("imagelabel",label);
 	$.get(imagePath, {op:'image',image:this.attr("title"), no:label},function(data){
 			$("body").data("imagesrc",data); //{src:data};
-			
+
 		});
-	
+
 	 // storing original coordinates
 	temp.ox = temp.attr("x");
 	temp.oy = temp.attr("y");
@@ -279,7 +282,7 @@ upOrigLine = function(){
 	lineArray[0]=["M",this.attr("x"),this.attr("y")];
 
 	lineArray[1]=["C",this.attr("x"),this.attr("y"),(this.attr("x")+30),(this.attr("y")+40),(this.attr("x")+60),(this.attr("y")+60)];
-	
+
 	var templine = drawLine(this.attr("title"),i, lineArray);
 	console.log(templine);
   elements[this.attr("title") + "_" + i] = templine;
