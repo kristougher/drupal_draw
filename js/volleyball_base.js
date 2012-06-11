@@ -47,12 +47,6 @@ var attributes = {
 		}
 }
 
-
-// If there is content in the
-travLocal(JSON.parse($("#draw-diagram").next().find("textarea").text()));
-
-
-
 palette['player'] = paper.image("/boxofdrills/image_res/player.png", 450, 30, 25, 29);
 palette['player'].attr("title","player");
 
@@ -116,8 +110,6 @@ function drawLine(objType,no,pData){
 
 	objectsArray[objKey][1].attr("title",objKey).attr("fill","#F00");
 
-//	if(objKey.indexOf("movement") > -1){
-	// det er en kurve
 	objectsArray[objKey][3] = paper.circle(x2,y2, 7);
 	var y1 = pData[1].pop();
 	var x1 = pData[1].pop();
@@ -293,6 +285,10 @@ upOrigLine = function(){
 palette['ballLine'].drag(move, start, upOrigLine);
 palette['movementLine'].drag(move, start, upOrigLine);
 toolbox.drag(moveOrig, startOrig, upOrig);
+
+
+// If there is content in the textfield, draw it.
+travLocal(JSON.parse($("#draw-diagram").next().find("textarea").text()));
 
 });
 })(jQuery);
