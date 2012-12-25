@@ -106,7 +106,6 @@ function theme_draw_canvas($variables) {
  * Creates the drawing in frontend.
  */
 function draw_preprocess_field(&$variables) {
-  
   if ($variables['field_name_css'] == 'field-diagram') {
     dpm($variables);
     $image_path = drupal_get_path('module', 'draw') . '/images';
