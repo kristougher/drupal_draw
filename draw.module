@@ -1,11 +1,30 @@
 <?php
+/**
+ * Implementation of hook_menu.
+ */
+function draw_menu() {
+  $items = array();
+  $items['admin/config/content/drupal_draw'] = array(
+    'title' => 'Draw settings',
+    'description' => 'Configuration for Draw',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('draw_admin_form'),
+    'file' => 'draw.admin.inc',
+    'access arguments' => array('access administration pages'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  return $items;
+}
 
+/**
+ * Implementation of hook_field_widget_info.
+ * Make the diagram an option for text_long fields.
+ */
 function draw_field_widget_info(){
   return array(
     'diagram' => array(
       'label' => t('Diagram'),
       'field types' => array('text_long'),
-     // 'settings' => array('rows' => 1, 'cols' => 1),
       'behaviors' => array(
       'multiple values' => FIELD_BEHAVIOR_DEFAULT, 
       'default value' => FIELD_BEHAVIOR_DEFAULT,
@@ -15,17 +34,26 @@ function draw_field_widget_info(){
   );
 }
 /** 
- * Implements hook_field_widget
+ * Implements hook_field_widget_form.
+ * Include the needed JS.
  */
 function draw_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+  $textarea_id = $element['#field_name'] . '[' . $element['#language'] . '][' . $element['#delta'] . '][value]';
+  $image_path = drupal_get_path('module', 'draw') . '/images';
+  $create_image_uri = 'public://drupal_draw/';
+  $path = drupal_get_path('module', 'draw') . '/js/';
+  drupal_add_js($path . 'raphael-min.js');
+  drupal_add_js($path . 'volleyball_base.js');
+  drupal_add_js($path . 'draw_basic.js');
   $element['value']= array(
     '#type' => 'textarea', // hidden',
-    '#prefix' => '<div id="draw-diagram"></div>',
-    '#attributes' => array('class' => 'draw-diagram-input'),
+    '#prefix' => '<div id="draw-diagram" data-target_element="' . $textarea_id . '" data-image_path="' . $image_path . '"></div>'
+      . '<div style="display: none;">',
+    '#attributes' => array('class' => array('draw-diagram-input')),
+    '#suffix' => '</div>',
   //  '#disabled' => TRUE,
     '#default_value' => $items[0]['value'],
   );
-  
   return $element; 
 }
 
@@ -48,17 +76,7 @@ function draw_field_formatter_view($object_type, $object, $field, $instance, $la
 
   return $element;
 }
-function draw_form_alter(&$form, &$form_state, $form_id){
-  if ($form['#node_edit_form']) {
-    $path = drupal_get_path('module', 'draw') . '/js/';
-    drupal_add_js($path . 'raphael-min.js');
- //   drupal_add_js('var paper = Raphael(document.getElementById("draw-diagram"), 500, 640);', 'inline');
-    drupal_add_js($path . 'volleyball_base.js');
-    drupal_add_js($path . 'draw_basic.js');
-    
- //   drupal_add_js($path . 'draw_editor.js');
-  }
-}
+
 /**
  * Implements hook_theme().
  *
@@ -81,4 +99,25 @@ function draw_theme($existing, $type, $theme, $path) {
 function theme_draw_canvas($variables) {
   $output = '<div class="canvas"></div>';
   return $output;
+}
+
+/**
+ * Implementation of hook_preprocess_field.
+ * Creates the drawing in frontend.
+ */
+function draw_preprocess_field(&$variables) {
+  
+  if ($variables['field_name_css'] == 'field-diagram') {
+    dpm($variables);
+    $image_path = drupal_get_path('module', 'draw') . '/images';
+    $path = drupal_get_path('module', 'draw') . '/js/';
+    drupal_add_js($path . 'raphael-min.js');
+    drupal_add_js($path . 'volleyball_base.js');
+    drupal_add_js($path . 'draw_basic.js');
+#    drupal_add_js($path . 'draw_reader.js');
+    $json = $variables['element']['#items'][0]['value'];
+    $variables['element']['#items'][0]['value'] = '<div class="canvas"></div>';
+    $variables['items'][0]['#markup'] = '<div class="draw-canvas" id="draw-diagram" data-image_path="' . $image_path . '"></div>';
+    drupal_add_js(array('draw' => array('drawing' => $json)), 'setting');
+  }
 }

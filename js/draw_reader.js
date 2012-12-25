@@ -1,6 +1,15 @@
 /*********
 * Draw curved line. Requires an attributes-object
 *********/
+(function ($) {
+  Drupal.behaviors.draw = {
+    attach : function(context, settings) {
+      console.log(Drupal.settings.draw.drawing);
+      travLocal(Drupal.settings.draw.drawing);
+    }
+  }
+})
+
 function drawLine(objType,no,pData,save){ 
 	var objKey = objType+"_"+no;
 	objectsArray[objKey] = new Array();
