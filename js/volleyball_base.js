@@ -111,7 +111,7 @@ function drawLine(objType,no,pData){
   var x2 = pData[1].pop();
 
   objectsArray[objKey][0] = paper.path(path);
-  objectsArray[objKey][0].attr(eval("attributes."+objType));
+  objectsArray[objKey][0].attr(eval("attributes."+objType)).attr({stroke: $("body").data("current_color")});
   if ($(".draw-diagram-input").length > 0) {
     objectsArray[objKey][1] = paper.circle(x,y, 7);
     objectsArray[objKey][1].attr("title",objKey).attr("fill","#F00").click(activate_line);
@@ -158,7 +158,7 @@ function drawObject(type, key, attr) {
     type = "path";
   }
   objectsArray[key] = eval("paper." + type + "({})");
-  objectsArray[key].attr(attr);
+  objectsArray[key].attr(attr).drag(move, start, up); //.click(activate_object(this));
 
   return attr;
 }
@@ -172,7 +172,7 @@ function travLocal(existing_data){
 }
 function drawFromJSON(key,jsonstr){
   var info = key.split("_");
-  console.log(jsonstr);
+
   var objTemp = jsonstr, temp;
   if(info[0].indexOf("Line") > -1){
     temp = drawLine(info[0], info[1], objTemp);
@@ -200,14 +200,21 @@ if ($(".draw-diagram-input").length > 0) {
   palette['movementLine'] = paper.image(image_path + "/pathicon2.png", 450, 150, 30, 27);
   palette['movementLine'].attr({"title":"movementLine"});
 
-  palette['freehand'] = paper.image(image_path + "/pathicon2.png", 450, 190, 30, 27);
+  palette['freehand'] = paper.image(image_path + "/pencil.png", 450, 190, 30, 27);
   palette['freehand'].attr({"title":"freehand"});
 
+  palette['undo'] = paper.image(image_path + "/undo.png", 450, 230, 30, 27);
+  palette['undo'].attr({"title":"undo"});
+
+  palette['trash'] = paper.image(image_path + "/trash.png", 450, 270, 30, 27);
+  palette['trash'].attr({"title":"trash"});
+
   palette['colors'] = {
-    blue: paper.rect(450, 280, 30, 30).attr({fill : "#77F", stroke: "#000"}),
-    red: paper.rect(450, 320, 30, 30).attr({fill : "#F77", stroke: "#000"}),
-    black: paper.rect(450, 400, 30, 30).attr({fill : "#000", stroke: "#000"}),
-    green: paper.rect(450, 360, 30, 30).attr({fill : "#7F7", stroke: "#000"}),
+    blue: paper.rect(468, 320, 30, 30).attr({fill : "#77F", stroke: "#000", "stroke-width": 2}),
+    red: paper.rect(428, 320, 30, 30).attr({fill : "#F33", stroke: "#000", "stroke-width": 2}),
+    black: paper.rect(428, 400, 30, 30).attr({fill : "#000", stroke: "#000", "stroke-width": 2}),
+    green: paper.rect(468, 400, 30, 30).attr({fill : "#3F3", stroke: "#000", "stroke-width": 2}),
+    grey: paper.rect(468, 360, 30, 30).attr({fill : "#777", stroke: "#000", "stroke-width": 2}),
   };
 
   for (var col in palette["colors"]) {
@@ -215,9 +222,9 @@ if ($(".draw-diagram-input").length > 0) {
       $("body").data("current_color", this.attr("fill"));
 
       for (var color in palette["colors"]) {
-        palette["colors"][color].attr({"stroke-width": 1, stroke: "#000"})
+        palette["colors"][color].attr({stroke: "#000"})
       }
-      this.attr({"stroke-width": 2, stroke: this.attr("fill")});
+      this.attr({stroke: this.attr("fill")});
     })
   }
 
@@ -255,6 +262,7 @@ activate_line = function() {
   for(var key in objectsArray[this.attr("title")]) {
     objectsArray[this.attr("title")][key].show().attr("opacity", 1);
   }
+  $("body").data("active", this.attr("title"));
 },
 deactivate_object = function(objKey) {
   if (objKey.indexOf("Line") > -1) {
@@ -263,7 +271,8 @@ deactivate_object = function(objKey) {
     objectsArray[objKey][3].attr("opacity", 0).hide();
   }
 },
-activate_graphic = function() {
+activate_object = function(obj) {
+  $("body").data("active", obj.attr("title"));
 },
 point_add = function(path_object, x, y) {
   console.log(path_object);
@@ -300,7 +309,7 @@ freehand_draw = function(dx, dy, x, y) {
   tempObject.attr({path: new_path});
 },
 freehand_end = function() {
-  bg.undrag();
+  bg.undrag().attr({cursor: "normal"});
   elements["path_" + i] = tempObject.attr();
   i++;
   saveLocal(elements);
@@ -369,9 +378,8 @@ upOrig = function () {
   // restoring state
   temp.attr({opacity: 1});
 
-  var key = this.attr("title"); //+"_"+i;
-
-  elements[this.attr("title") + "_" + $("body").data("imagelabel")] = drawFigure(key, $("body").data("imagelabel"), temp.attr());
+  elements[key] = drawFigure(this.attr("title"), i, temp.attr());
+  i++;
   $("body").data("imagelabel","");
   temp.remove();
   saveLocal(elements);
@@ -391,9 +399,24 @@ upOrigLine = function(){
 palette['ballLine'].drag(move, start, upOrigLine);
 palette['movementLine'].drag(move, start, upOrigLine);
 palette['freehand'].click(function(){
-  bg.drag(freehand_draw, freehand_start, freehand_end);
+  bg.drag(freehand_draw, freehand_start, freehand_end).attr({cursor: "crosshair"});
 });
 toolbox.drag(moveOrig, startOrig, upOrig);
+
+palette['trash'].click(function(){
+  delete objectsArray[$("body").data("active")];
+  delete elements[$("body").data("active")];
+  saveLocal(elements);
+});
+palette['undo'].click(function(){
+  if (typeof(Storage)!=="undefined") {
+
+  }
+  if (typeof $("body").data("draw_latest") != "undefined") {
+    elements[$("body").data("draw_latest")].remove();
+    saveLocal(elements);
+  }
+});
 }
 var saved_drawing;
 if ($("#edit-field-diagram-und-0-value").length && $("#edit-field-diagram-und-0-value").val().length > 2) {
@@ -408,11 +431,5 @@ if (typeof saved_drawing != "undefined") {
   }
 }
 $("body").data("active", "");
-/*
-// If there is content in the textfield, draw it.
-if ($("#draw-diagram").next().find("textarea").text().length > 0) {
-  travLocal(JSON.parse($("#draw-diagram").next().find("textarea").text()));
-}
-*/
 });
 })(jQuery);
