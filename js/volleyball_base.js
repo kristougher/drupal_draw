@@ -4,7 +4,8 @@ tempObject,
 elements = {},
 i = 0,
 editor_mode = (jQuery(".draw-diagram-input").length > 0),
-current_attributes = {};
+current_attributes = {},
+bounding_box = {};
 (function ($) {
   /**
   var drupal_draw_drawing = {
@@ -68,7 +69,6 @@ var attributes = {
 			src = data;
 
 		});
-			alert(JSON.stringify(src));
 			JSON.stringify(src)
 			return src;
 		},
@@ -151,6 +151,7 @@ function drawFigure(type, no, attr){
  * Draw generic.
  */
 function drawObject(type, key, attr) {
+  key = type + "_" + key;
   if (type == "coach" || type == "player") {
     type = "image";
   }
@@ -158,7 +159,10 @@ function drawObject(type, key, attr) {
     type = "path";
   }
   objectsArray[key] = eval("paper." + type + "({})");
-  objectsArray[key].attr(attr).drag(move, start, up); //.click(activate_object(this));
+  objectsArray[key].attr(attr).drag(move, start, up);
+  objectsArray[key].click(function () {
+    $("body").data("active", this.attr("title"));
+  });
 
   return attr;
 }
@@ -200,8 +204,11 @@ if ($(".draw-diagram-input").length > 0) {
   palette['movementLine'] = paper.image(image_path + "/pathicon2.png", 450, 150, 30, 27);
   palette['movementLine'].attr({"title":"movementLine"});
 
-  palette['freehand'] = paper.image(image_path + "/pencil.png", 450, 190, 30, 27);
-  palette['freehand'].attr({"title":"freehand"});
+  palette['freehand'] = paper.image(image_path + "/pencil.png", 410, 190, 30, 27);
+  palette['freehand'].attr({"title":"path"});
+
+  palette['rect'] = paper.image(image_path + "/rectangle.png", 450, 190, 30, 27);
+  palette['rect'].attr({"title":"rect"});
 
   palette['undo'] = paper.image(image_path + "/undo.png", 450, 230, 30, 27);
   palette['undo'].attr({"title":"undo"});
@@ -265,14 +272,17 @@ activate_line = function() {
   $("body").data("active", this.attr("title"));
 },
 deactivate_object = function(objKey) {
-  if (objKey.indexOf("Line") > -1) {
+  if (typeof objKey != "undefined" && objKey.indexOf("Line") > -1) {
     objectsArray[objKey][1].attr("opacity", "50%");
     objectsArray[objKey][2].attr("opacity", 0).hide();
     objectsArray[objKey][3].attr("opacity", 0).hide();
   }
 },
-activate_object = function(obj) {
-  $("body").data("active", obj.attr("title"));
+activate_object = function(objTitle) {
+  deactivate_object($("body").data("active"));
+//  bounding_box = objectsArray[objTitle].getBBox();
+
+  $("body").data("active", objTitle);
 },
 point_add = function(path_object, x, y) {
   console.log(path_object);
@@ -281,37 +291,46 @@ point_add = function(path_object, x, y) {
 
   return path_object;
 }
-rectangle_start = function() {
+rectangle_start = function(x, y) {
+  var canvas_offset = $("#draw-diagram").offset();
 
+  tempObject = paper.rect((x - canvas_offset.left), (y - canvas_offset.top), 5, 5);
+  tempObject.attr({stroke: $("body").data("current_color"), "stroke-width": 2, title: "rect_" + i});
+  tempObject.key = "rect_" + i;
 },
-rectangle_draw = function() {
-
+rectangle_draw = function(dx, dy, x, y) {
+  tempObject.attr({width: Math.sqrt(dx * dx), height: Math.sqrt(dy * dy)});
 },
 rectangle_end = function() {
-
+  bg.undrag().attr({cursor: "default"});
+  elements["rect_" + i] = tempObject.attr();
+  i++;
+  saveLocal(elements);
 },
 freehand_start = function(x, y) {
-  tempObject = paper.path().attr({stroke: $("body").data("current_color")});
-  console.log($("body").data("current_color"));
+  tempObject = paper.path().attr({stroke: $("body").data("current_color"), "stroke-width": 2, title: "path_" + i});
   var canvas_offset = $("#draw-diagram").offset();
   tempObject.ox = x - canvas_offset.left;
   tempObject.oy = y - canvas_offset.top;
+  tempObject.key = "path_" + i;
+  i++;
 
   tempObject.attr({path: "M" + tempObject.ox + " " + tempObject.oy + " C" + tempObject.ox + " " + tempObject.oy});
-  
-  console.log(tempObject.ox, tempObject.oy);
 },
 freehand_draw = function(dx, dy, x, y) {
   dx += tempObject.ox;
   dy += tempObject.oy;
-  console.log(dx, dy);
+
   var new_path = tempObject.attr("path") + " " + dx + " " + dy;
   tempObject.attr({path: new_path});
 },
 freehand_end = function() {
-  bg.undrag().attr({cursor: "normal"});
-  elements["path_" + i] = tempObject.attr();
-  i++;
+  bg.undrag().attr({cursor: "default"});
+  objectsArray[tempObject.key] = tempObject;
+  elements[tempObject.key] = tempObject.attr();
+  
+  objectsArray[tempObject.key].click(function(){ activate_object(this.attr("title")) });
+
   saveLocal(elements);
 };
 
@@ -378,11 +397,12 @@ upOrig = function () {
   // restoring state
   temp.attr({opacity: 1});
 
-  elements[key] = drawFigure(this.attr("title"), i, temp.attr());
+  elements[this.attr("title") + "_" + i] = drawFigure(this.attr("title"), i, temp.attr());
   i++;
   $("body").data("imagelabel","");
   temp.remove();
   saveLocal(elements);
+  $("body").data("active", this.attr("title") + "_" + i);
 },
 upOrigLine = function(){
 	var lineArray = new Array();
@@ -391,22 +411,41 @@ upOrigLine = function(){
 	lineArray[1]=["C",this.attr("x"),this.attr("y"),(this.attr("x")+30),(this.attr("y")+40),(this.attr("x")+60),(this.attr("y")+60)];
 
 	var templine = drawLine(this.attr("title"),i, lineArray);
+
   elements[this.attr("title") + "_" + i] = templine;
   saveLocal(elements);
-	i++;
 	this.attr({x: this.ox, y: this.oy, opacity: 1});
+  $("body").data("active", this.attr("title") + "_" + i);
+  i++;
 };
+
+// Palette functions.
 palette['ballLine'].drag(move, start, upOrigLine);
 palette['movementLine'].drag(move, start, upOrigLine);
 palette['freehand'].click(function(){
   bg.drag(freehand_draw, freehand_start, freehand_end).attr({cursor: "crosshair"});
 });
+palette['rect'].click(function(){
+  bg.drag(rectangle_draw, rectangle_start, freehand_end).attr({cursor: "crosshair"});
+});
 toolbox.drag(moveOrig, startOrig, upOrig);
 
 palette['trash'].click(function(){
+  // Lines are actually 3 objects. They all need to be removed.
+  if($("body").data("active").indexOf("Line") > -1) {
+    for (var j in objectsArray[$("body").data("active")]) {
+      objectsArray[$("body").data("active")][j].remove();
+    }
+  }
+  else {
+    // Other objects.
+    objectsArray[$("body").data("active")].remove();
+  }
+  // Delete the data of the object.
   delete objectsArray[$("body").data("active")];
   delete elements[$("body").data("active")];
   saveLocal(elements);
+  $("body").data("active", "");
 });
 palette['undo'].click(function(){
   if (typeof(Storage)!=="undefined") {
