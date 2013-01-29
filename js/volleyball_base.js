@@ -4,7 +4,7 @@ tempObject,
 elements = {},
 i = 0,
 editor_mode = (jQuery(".draw-diagram-input").length > 0),
-current_attributes = {},
+current_attributes = {"stroke-width": 2},
 bounding_box = {};
 (function ($) {
   /**
@@ -42,10 +42,10 @@ var paper = Raphael(document.getElementById("draw-diagram"), 500, 640);
 
 // var i = 0;
 paper.setStart();
-paper.rect(0,0,400,640, 5).attr("fill","#ddd");
+paper.rect(0,0,400,640, 5).attr({"fill": "#ddd"});
 
 var court = paper.rect(50,20,300,600);
-court.attr("fill", "#fb7");
+court.attr({"fill": "#aaa", "stroke-width": 3});
 court.attr("stroke", "#FFF");
 var lines = paper.set();
 lines.push(
@@ -53,7 +53,7 @@ lines.push(
 	paper.path("M50 220L350 220"),
 	paper.path("M50 420L350 420")
 );
-lines.attr("stroke","#FFF");
+lines.attr({"stroke":"#FFF", "stroke-width": 3});
 var bg = paper.setFinish();
 $("body").data("current_color", "#000");
 
@@ -61,8 +61,8 @@ $("body").data("current_color", "#000");
 Attributes for the objects in the palette
 ***/
 var attributes = {
-	ballLine: { "stroke":"#222","stroke-dasharray":"-", "arrow-end": "classic-wide-long", "stroke-width": 2},
-	movementLine: {"stroke":"#999","stroke-dasharray":"--", "arrow-end": "classic-wide-long", "stroke-width": 2},
+  movementLine: {"arrow-end": "classic-wide-long", "stroke-dasharray": "--", "stroke-width": 2},
+	ballLine: {"arrow-end": "classic-wide-long", "stroke-dasharray": "-", "stroke-width": 2},
 	coach: function(no){
 		var src;
 		$.get(imagePath, {op:"image",image:"coach", no:no},function(data){
@@ -111,7 +111,7 @@ function drawLine(objType,no,pData){
   var x2 = pData[1].pop();
 
   objectsArray[objKey][0] = paper.path(path);
-  objectsArray[objKey][0].attr(eval("attributes."+objType)).attr({stroke: $("body").data("current_color")});
+  objectsArray[objKey][0].attr(eval("attributes."+objType)).attr(current_attributes);
   if ($(".draw-diagram-input").length > 0) {
     objectsArray[objKey][1] = paper.circle(x,y, 7);
     objectsArray[objKey][1].attr("title",objKey).attr("fill","#F00").click(activate_line);
@@ -159,10 +159,8 @@ function drawObject(type, key, attr) {
     type = "path";
   }
   objectsArray[key] = eval("paper." + type + "({})");
-  objectsArray[key].attr(attr).drag(move, start, up);
-  objectsArray[key].click(function () {
-    $("body").data("active", this.attr("title"));
-  });
+  objectsArray[key].attr(attr).drag(move, start, up).attr({title: key});
+  objectsArray[key].click(function() { activate_object(this.attr("title")) });
 
   return attr;
 }
@@ -185,7 +183,7 @@ function drawFromJSON(key,jsonstr){
     temp = drawObject(info[0], info[1], objTemp, false); // drawFigure(info[0], info[1], objTemp, false);
   }
   elements[key] = temp;
-  saveLocal(elements);
+  saveLocal(elements, key);
   i++;
 }
 
@@ -193,40 +191,48 @@ if ($(".draw-diagram-input").length > 0) {
   palette['player'] = paper.image(image_path + "/player.png", 450, 30, 25, 29);
   palette['player'].attr("title","player");
 
-  palette['coach'] = paper.image(image_path + "/coach.png", 450, 70, 25, 29);
+  palette['coach'] = paper.image(image_path + "/coach.png", 410, 30, 25, 29);
   palette['coach'].attr("fill", "#0fb");
   palette['coach'].attr("stroke", "#00f");
   palette['coach'].attr("title","coach");
 
-  palette['ballLine'] = paper.image(image_path + "/pathicon1.png", 450, 110, 29, 28);
+  palette['text'] = paper.image(image_path + "/type.png", 410, 70, 29, 28);
+  palette['text'].attr({"title":"text"});
+
+  palette['ballLine'] = paper.image(image_path + "/pathicon1.png", 410, 110, 29, 28);
   palette['ballLine'].attr({"title":"ballLine"});
 
-  palette['movementLine'] = paper.image(image_path + "/pathicon2.png", 450, 150, 30, 27);
-  palette['movementLine'].attr({"title":"movementLine"});
+  palette['circle'] = paper.image(image_path + "/circle.png", 450, 110, 29, 28);
+  palette['circle'].attr({"title":"circle"});
 
-  palette['freehand'] = paper.image(image_path + "/pencil.png", 410, 190, 30, 27);
+  palette['freehand'] = paper.image(image_path + "/pencil.png", 410, 150, 30, 27);
   palette['freehand'].attr({"title":"path"});
 
-  palette['rect'] = paper.image(image_path + "/rectangle.png", 450, 190, 30, 27);
+  palette['rect'] = paper.image(image_path + "/rectangle.png", 450, 150, 30, 27);
   palette['rect'].attr({"title":"rect"});
-
+/*
   palette['undo'] = paper.image(image_path + "/undo.png", 450, 230, 30, 27);
   palette['undo'].attr({"title":"undo"});
-
-  palette['trash'] = paper.image(image_path + "/trash.png", 450, 270, 30, 27);
+*/
+  palette['trash'] = paper.image(image_path + "/trash.png", 450, 190, 30, 27);
   palette['trash'].attr({"title":"trash"});
 
+  palette['solid_line'] = paper.image(image_path + "/pathicon0.png", 410, 270, 29, 28);
+  palette['dotted_line'] = paper.image(image_path + "/pathicon1.png", 440, 270, 29, 28);
+  palette['dashed_line'] = paper.image(image_path + "/pathicon2.png", 470, 270, 30, 27);
+
   palette['colors'] = {
-    blue: paper.rect(468, 320, 30, 30).attr({fill : "#77F", stroke: "#000", "stroke-width": 2}),
-    red: paper.rect(428, 320, 30, 30).attr({fill : "#F33", stroke: "#000", "stroke-width": 2}),
-    black: paper.rect(428, 400, 30, 30).attr({fill : "#000", stroke: "#000", "stroke-width": 2}),
-    green: paper.rect(468, 400, 30, 30).attr({fill : "#3F3", stroke: "#000", "stroke-width": 2}),
-    grey: paper.rect(468, 360, 30, 30).attr({fill : "#777", stroke: "#000", "stroke-width": 2}),
+    blue: paper.rect(409, 320, 25, 25).attr({fill : "#77F", stroke: "#000", "stroke-width": 2}),
+    red: paper.rect(442, 320, 25, 25).attr({fill : "#F33", stroke: "#000", "stroke-width": 2}),
+    black: paper.rect(475, 320, 25, 25).attr({fill : "#000", stroke: "#000", "stroke-width": 2}),
+    green: paper.rect(409, 360, 25, 25).attr({fill : "#3F3", stroke: "#000", "stroke-width": 2}),
+    white: paper.rect(442, 360, 25, 25).attr({fill : "#FFF", stroke: "#000", "stroke-width": 2}),
+    grey: paper.rect(475, 360, 25, 25).attr({fill : "#777", stroke: "#000", "stroke-width": 2}),
   };
 
   for (var col in palette["colors"]) {
     palette["colors"][col].click(function() {
-      $("body").data("current_color", this.attr("fill"));
+      current_attributes.stroke = this.attr("fill");
 
       for (var color in palette["colors"]) {
         palette["colors"][color].attr({stroke: "#000"})
@@ -257,7 +263,7 @@ up = function () {
     // restoring state
     this.attr({opacity: this.oop});
     elements[this.attr("title")] = this.attr();
-    saveLocal(elements);
+    saveLocal(elements, this.attr("title"));
     this.attr({opacity: 1});
     //jsonObj.figures[this.attr("title")] = this.attr();
 },
@@ -280,22 +286,52 @@ deactivate_object = function(objKey) {
 },
 activate_object = function(objTitle) {
   deactivate_object($("body").data("active"));
-//  bounding_box = objectsArray[objTitle].getBBox();
-
   $("body").data("active", objTitle);
 },
 point_add = function(path_object, x, y) {
-  console.log(path_object);
   var new_path = path_object.attr("path") + " " + x + " " + y;
   path_object.attr({path: new_path});
 
   return path_object;
-}
+},
+text_start = function(e) {
+  $("body").append('<div id="draw-text-input"><input type="text" /></div>');
+  $("#draw-text-input").css({position: "absolute", top: e.pageY, left: e.pageX});
+  $("#draw-text-input input").keyup(function(k){ 
+    if (k.keyCode == 13) {
+      tempObject = paper.text(e.layerX, e.layerY, $(this).val()).attr(current_attributes).attr({"font-size":"20px", type: "text"});
+      tempObject.key = "text_" + i;
+     // tempObject = paper.print(e.layerX, e.layerY, "print", paper.getFont("Arial"), 30).attr(current_attributes);
+      elements["text_" + i] = tempObject.attr();
+      i++;
+      saveLocal(elements);
+      $("#draw-text-input").remove();
+      bg.unclick().attr({cursor: "auto"});
+    } 
+
+  }).focus();
+},
+circle_start = function(x, y) {
+  var canvas_offset = $("#draw-diagram").offset();
+
+  tempObject = paper.circle((x - canvas_offset.left), (y - canvas_offset.top), 5);
+  tempObject.attr({"stroke-width": 2, type: "circle", title: "circle_" + i}).attr(current_attributes);
+  tempObject.key = "circle_" + i;
+},
+circle_draw = function(dx, dy, x, y) {
+  tempObject.attr({r: Math.sqrt((dx * dx) + (dy * dy))});
+},
+circle_end = function() {
+  bg.undrag().attr({cursor: "default"});
+  elements["circle_" + i] = tempObject.attr();
+  i++;
+  saveLocal(elements);
+},
 rectangle_start = function(x, y) {
   var canvas_offset = $("#draw-diagram").offset();
 
   tempObject = paper.rect((x - canvas_offset.left), (y - canvas_offset.top), 5, 5);
-  tempObject.attr({stroke: $("body").data("current_color"), "stroke-width": 2, title: "rect_" + i});
+  tempObject.attr({"stroke-width": 2, title: "rect_" + i}).attr(current_attributes);
   tempObject.key = "rect_" + i;
 },
 rectangle_draw = function(dx, dy, x, y) {
@@ -308,7 +344,8 @@ rectangle_end = function() {
   saveLocal(elements);
 },
 freehand_start = function(x, y) {
-  tempObject = paper.path().attr({stroke: $("body").data("current_color"), "stroke-width": 2, title: "path_" + i});
+  console.log(current_attributes);
+  tempObject = paper.path().attr(current_attributes);
   var canvas_offset = $("#draw-diagram").offset();
   tempObject.ox = x - canvas_offset.left;
   tempObject.oy = y - canvas_offset.top;
@@ -327,6 +364,7 @@ freehand_draw = function(dx, dy, x, y) {
 freehand_end = function() {
   bg.undrag().attr({cursor: "default"});
   objectsArray[tempObject.key] = tempObject;
+  objectsArray[tempObject.key].attr("title", tempObject.key);
   elements[tempObject.key] = tempObject.attr();
   
   objectsArray[tempObject.key].click(function(){ activate_object(this.attr("title")) });
@@ -418,17 +456,45 @@ upOrigLine = function(){
   $("body").data("active", this.attr("title") + "_" + i);
   i++;
 };
-
+function palette_select(selected){
+  $.each(palette, function(index, item){
+    console.log(index, item);
+    item.attr({stroke: "#FFF"});
+  });
+  palette[selected].attr({stroke: "#000"});
+}
 // Palette functions.
-palette['ballLine'].drag(move, start, upOrigLine);
-palette['movementLine'].drag(move, start, upOrigLine);
+palette['ballLine'].drag(move, start, upOrigLine).attr({cursor: "pointer"});
+
+palette['text'].click(function(){
+  bg.click(text_start).attr({cursor: "text"});
+  palette_select("text");
+}).attr({cursor: "pointer"});
+
+palette['solid_line'].click(function(){
+  current_attributes["stroke-dasharray"] = "";
+}).attr({cursor: "pointer"});
+
+palette['dotted_line'].click(function(){
+  current_attributes["stroke-dasharray"] = "-";
+}).attr({cursor: "pointer"});
+
+palette['dashed_line'].click(function(){
+  current_attributes["stroke-dasharray"] = "--";
+}).attr({cursor: "pointer"});
+
+palette['circle'].click(function(){
+  bg.drag(circle_draw, circle_start, freehand_end).attr({cursor: "crosshair"});
+}).attr({cursor: "pointer"});
+
 palette['freehand'].click(function(){
   bg.drag(freehand_draw, freehand_start, freehand_end).attr({cursor: "crosshair"});
-});
+}).attr({cursor: "pointer"});
+
 palette['rect'].click(function(){
   bg.drag(rectangle_draw, rectangle_start, freehand_end).attr({cursor: "crosshair"});
-});
-toolbox.drag(moveOrig, startOrig, upOrig);
+}).attr({cursor: "pointer"});
+toolbox.drag(moveOrig, startOrig, upOrig).attr({cursor: "pointer"});
 
 palette['trash'].click(function(){
   // Lines are actually 3 objects. They all need to be removed.
@@ -447,16 +513,29 @@ palette['trash'].click(function(){
   saveLocal(elements);
   $("body").data("active", "");
 });
+/*
+// Undo function
 palette['undo'].click(function(){
-  if (typeof(Storage)!=="undefined") {
+  // We need data from localStorage to restore the latest object.
+  if (typeof(localStorage) !== "undefined") {
+    var undo_data = JSON.parse(localStorage.undo);
+    console.log(undo_data);
+  }
+  else {
+    return false;
+  }
 
-  }
   if (typeof $("body").data("draw_latest") != "undefined") {
+    $("body").data("active", $("body").data("draw_latest"));
+    objectsArray[$("body").data("draw_latest")]
     elements[$("body").data("draw_latest")].remove();
-    saveLocal(elements);
+    drawFromJSON($("body").data("draw_latest"), undo_data);
   }
+  saveLocal(elements);
 });
+*/
 }
+
 var saved_drawing;
 if ($("#edit-field-diagram-und-0-value").length && $("#edit-field-diagram-und-0-value").val().length > 2) {
    saved_drawing = JSON.parse($("#edit-field-diagram-und-0-value").val());
