@@ -59,8 +59,6 @@ $("body").data("current_color", "#000");
 Attributes for the objects in the palette
 ***/
 var attributes = {
-  movementLine: {"arrow-end": "classic-wide-long", "stroke-dasharray": "--", "stroke-width": 2},
-	ballLine: {"arrow-end": "classic-wide-long", "stroke-dasharray": "-", "stroke-width": 2},
 	coach: function(no){
 		var src;
 		$.get(imagePath, {op:"image",image:"coach", no:no},function(data){
@@ -91,20 +89,23 @@ if ($(".draw-diagram-input").length > 0) {
   palette['coach'].attr("stroke", "#00f");
   palette['coach'].attr("title","coach");
 
-  palette['text'] = paper.image(image_path + "/type.png", 410, 70, 29, 28);
-  palette['text'].attr({"title":"text", opacity: "0.7"});
+  palette['tools'] = [];
+  palette['tools']['text'] = paper.image(image_path + "/type.png", 410, 70, 29, 28);
+  palette['tools']['text'].attr({"title":"text", opacity: "0.7"});
 
-  palette['ballLine'] = paper.image(image_path + "/pathicon1.png", 410, 110, 29, 28);
-  palette['ballLine'].attr({"title":"ballLine", opacity: "0.7"});
+  palette['tools']['vector'] = paper.image(image_path + "/vector.png", 410, 110, 29, 28);
+  palette['tools']['vector'].attr({"title":"path", opacity: "0.7"});
 
-  palette['circle'] = paper.image(image_path + "/circle.png", 450, 110, 29, 28);
-  palette['circle'].attr({"title":"circle", opacity: "0.7"});
+  palette['tools']['circle'] = paper.image(image_path + "/circle.png", 450, 110, 29, 28);
+  palette['tools']['circle'].attr({"title":"circle", opacity: "0.7"});
 
-  palette['freehand'] = paper.image(image_path + "/pencil.png", 410, 150, 30, 27);
-  palette['freehand'].attr({"title":"path", opacity: "0.7"});
+  palette['tools']['freehand'] = paper.image(image_path + "/pencil.png", 410, 150, 30, 27);
+  palette['tools']['freehand'].attr({"title":"path", opacity: "0.7"});
 
-  palette['rect'] = paper.image(image_path + "/rectangle.png", 450, 150, 30, 27);
-  palette['rect'].attr({"title":"rect", opacity: "0.7"});
+  palette['tools']['rect'] = paper.image(image_path + "/rectangle.png", 450, 150, 30, 27);
+  palette['tools']['rect'].attr({"title":"rect", opacity: "0.7"});
+
+
 /*
   palette['undo'] = paper.image(image_path + "/undo.png", 450, 230, 30, 27);
   palette['undo'].attr({"title":"undo"});
@@ -112,13 +113,13 @@ if ($(".draw-diagram-input").length > 0) {
   palette['trash'] = paper.image(image_path + "/trash.png", 450, 190, 30, 27);
   palette['trash'].attr({"title":"trash"});
 
+/**** Path dashes ****/
   palette['dashes'] = [];
   palette['dashes']['dash'] = paper.image(image_path + "/pathicon0.png", 410, 270, 29, 28).attr({"stroke-dasharray": ""});
   palette['dashes']['dash-'] = paper.image(image_path + "/pathicon1.png", 440, 270, 29, 28).attr({"stroke-dasharray": "-", opacity: "0.7"});
   palette['dashes']['dash--'] = paper.image(image_path + "/pathicon2.png", 470, 270, 30, 27).attr({"stroke-dasharray": "--", opacity: "0.7"});
 
   for (var dash in palette["dashes"]) {
-    console.log(i, {item:palette["dashes"][dash].attr("stroke-dasharray")});
     palette["dashes"][dash].click(function() {
 
       current_attributes["stroke-dasharray"] = this.attr("stroke-dasharray");
@@ -130,6 +131,7 @@ if ($(".draw-diagram-input").length > 0) {
     });
   }
 
+/**** Colors ****/
   palette['colors'] = {
     blue: paper.rect(409, 320, 25, 25).attr({fill : "#77F", stroke: "#000", "stroke-width": 2}),
     red: paper.rect(442, 320, 25, 25).attr({fill : "#F33", stroke: "#000", "stroke-width": 2}),
@@ -152,6 +154,55 @@ if ($(".draw-diagram-input").length > 0) {
 
   var toolbox = paper.set();
   toolbox.push(palette['coach'],palette['player']);
+
+// Palette functions.
+//palette['ballLine'].drag(drupal_draw_drawing.editor.move, drupal_draw_drawing.editor.start, drupal_draw_drawing.editor.upOrigLine).attr({cursor: "pointer"});
+function palette_tools_select(selected, background){
+  for (var tool in palette["tools"]) {
+    palette["tools"][tool].attr({opacity: "0.6"});
+  }
+  selected.attr({opacity: 1});
+  clear_element_events(background);
+}
+
+palette["tools"]['vector'].click(function(){
+  palette_tools_select(this, bg);
+  bg.click(drupal_draw_drawing.editor.vector_start).attr({cursor: "crosshair"});
+  bg.dblclick(function(e) {
+    bg.unclick();
+    drupal_draw_drawing.editor.vector_end(e);
+    bg.undblclick();
+    clear_element_events(this);
+  }).attr({cursor: "auto"});
+
+}).attr({cursor: "pointer"});
+
+palette["tools"]['text'].click(function(){
+  palette_tools_select(this, bg);
+  bg.click(function(e) {
+    drupal_draw_drawing.editor.text_start(e);
+
+    clear_element_events(this);
+  }).attr({cursor: "text"});
+}).attr({cursor: "pointer"});
+
+palette["tools"]['circle'].click(function(){
+  palette_tools_select(this, bg);
+  bg.drag(drupal_draw_drawing.editor.circle_draw, drupal_draw_drawing.editor.circle_start, drupal_draw_drawing.editor.freehand_end).attr({cursor: "crosshair"});
+}).attr({cursor: "pointer"});
+
+palette["tools"]['freehand'].click(function(){
+  palette_tools_select(this, bg);
+  bg.drag(drupal_draw_drawing.editor.freehand_draw, drupal_draw_drawing.editor.freehand_start, drupal_draw_drawing.editor.freehand_end).attr({cursor: "crosshair"});
+}).attr({cursor: "pointer"});
+
+palette["tools"]['rect'].click(function(){
+  palette_tools_select(this, bg);
+  bg.drag(drupal_draw_drawing.editor.rectangle_draw, drupal_draw_drawing.editor.rectangle_start, drupal_draw_drawing.editor.freehand_end).attr({cursor: "crosshair"});
+}).attr({cursor: "pointer"});
+
+
+
 
 // The temp var. Frequently used below
 var temp;
@@ -246,20 +297,39 @@ drupal_draw_drawing.editor = {
     i++;
     saveLocal(elements);
   },
-  rectangle_start: function(x, y) {
+  vector_start: function(event) {
     var canvas_offset = $("#draw-diagram").offset();
+    var x = event.pageX - canvas_offset.left;
+    var y = event.pageY - canvas_offset.top;
+    // The object has not been created yet.
+    if (typeof tempObject == "undefined" || tempObject.type != "path") {
+      tempObject = paper.path().attr(current_attributes);
+      tempObject.key = "path_" + i;
+      i++;
+      tempObject.attr({path: "M" + x + " " + y + " C" + x + " " + y + " " + x + " " + y});
 
-    tempObject = paper.rect((x - canvas_offset.left), (y - canvas_offset.top), 5, 5);
-    tempObject.attr({"stroke-width": 2, title: "rect_" + i}).attr(current_attributes);
-    tempObject.key = "rect_" + i;
+    }
+    else {
+      var new_path = tempObject.attr("path") + " " + x + " " + y;
+      tempObject.attr({path: new_path});
+    }
   },
-  rectangle_draw: function(dx, dy, x, y) {
-    tempObject.attr({width: Math.sqrt(dx * dx), height: Math.sqrt(dy * dy)});
+  vector_point_add: function(event) {
+    var canvas_offset = $("#draw-diagram").offset();
+    var x = event.pageX - canvas_offset.left;
+    var y = event.pageY - canvas_offset.top;
+
+    var new_path = tempObject.attr("path") + " " + x + " " + y;
+    tempObject.attr({path: new_path});
   },
-  rectangle_end: function() {
-    bg.undrag().attr({cursor: "default"});
-    elements["rect_" + i] = tempObject.attr();
-    i++;
+  vector_end: function(event) {
+    drupal_draw_drawing.editor.vector_point_add(event);
+
+    tempObject.attr({"arrow-end": "classic-wide-long"});
+    elements[tempObject.key] = tempObject.attr();
+    objectsArray[tempObject.key] = tempObject;
+    objectsArray[tempObject.key].click(function(){ drupal_draw_drawing.editor.activate_object(this.attr("title")) });
+
     saveLocal(elements);
   },
   freehand_start: function(x, y) {
@@ -321,7 +391,22 @@ drupal_draw_drawing.editor = {
       elements[this.attr("title")] = objectsArray[this.attr("title")][0].attr();
       saveLocal(elements);
   },
+  rectangle_start: function(x, y) {
+    var canvas_offset = $("#draw-diagram").offset();
 
+    tempObject = paper.rect((x - canvas_offset.left), (y - canvas_offset.top), 5, 5);
+    tempObject.attr({"stroke-width": 2, title: "rect_" + i}).attr(current_attributes);
+    tempObject.key = "rect_" + i;
+  },
+  rectangle_draw: function(dx, dy, x, y) {
+    tempObject.attr({width: Math.sqrt(dx * dx), height: Math.sqrt(dy * dy)});
+  },
+  rectangle_end: function() {
+    bg.undrag().attr({cursor: "default"});
+    elements["rect_" + i] = tempObject.attr();
+    i++;
+    saveLocal(elements);
+  },
   // Attributes for dragging prototypes
   startOrig: function () {
   	temp = this.clone();
@@ -365,33 +450,18 @@ drupal_draw_drawing.editor = {
     i++;
   }
 };
-function palette_select(selected){
-  $.each(palette, function(index, item){
-    item.attr({stroke: "#FFF"});
-  });
-  palette[selected].attr({stroke: "#000"});
-}
 
-// Palette functions.
-palette['ballLine'].drag(drupal_draw_drawing.editor.move, drupal_draw_drawing.editor.start, drupal_draw_drawing.editor.upOrigLine).attr({cursor: "pointer"});
-
-palette['text'].click(function(){
-  bg.click(drupal_draw_drawing.editor.text_start).attr({cursor: "text"});
-  palette_select("text");
-}).attr({cursor: "pointer"});
-
-palette['circle'].click(function(){
-  bg.drag(drupal_draw_drawing.editor.circle_draw, drupal_draw_drawing.editor.circle_start, drupal_draw_drawing.editor.freehand_end).attr({cursor: "crosshair"});
-}).attr({cursor: "pointer"});
-
-palette['freehand'].click(function(){
-  bg.drag(drupal_draw_drawing.editor.freehand_draw, drupal_draw_drawing.editor.freehand_start, drupal_draw_drawing.editor.freehand_end).attr({cursor: "crosshair"});
-}).attr({cursor: "pointer"});
-
-palette['rect'].click(function(){
-  bg.drag(drupal_draw_drawing.editor.rectangle_draw, drupal_draw_drawing.editor.rectangle_start, drupal_draw_drawing.editor.freehand_end).attr({cursor: "crosshair"});
-}).attr({cursor: "pointer"});
 toolbox.drag(drupal_draw_drawing.editor.moveOrig, drupal_draw_drawing.editor.startOrig, drupal_draw_drawing.editor.upOrig).attr({cursor: "pointer"});
+
+function clear_element_events(element) {
+  if (typeof element.events == "undefined") {
+    return false;
+  }
+  while(element.events.length){          
+            var e = element.events.pop();
+            e.unbind();
+        }
+}
 
 palette['trash'].click(function(){
   // Lines are actually 3 objects. They all need to be removed.
