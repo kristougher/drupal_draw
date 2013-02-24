@@ -71,23 +71,6 @@ function drawLine(objType,no,pData){
   }
   return objectsArray[objKey][0].attr();
 }
-/**********
-* Draw figure from graphics file
-***********/
-function drawFigure(type, no, attr){
-  var key = type + "_" + no;
-    objectsArray[key] = paper.image(attr.src,attr.x,attr.y,attr.width,attr.height);
-    if (editor_mode) {
-      objectsArray[key].drag(drupal_draw_drawing.editor.move, drupal_draw_drawing.editor.start, drupal_draw_drawing.editor.up);
-      objectsArray[key].attr("title", key);
-    }
-    if(jQuery("body").data("imagesrc")){
-          objectsArray[key].attr({src:jQuery("body").data("imagesrc")});
-      jQuery("body").data("imagesrc","");
-    }
-
-    return objectsArray[key].attr();
-}
 /**
  * Draw generic.
  */
@@ -125,7 +108,7 @@ function drawFromJSON(key,jsonstr){
     temp = drawLine(info[0], info[1], objTemp);
   }
   else {
-    temp = drawObject(info[0], info[1], objTemp, false); // drawFigure(info[0], info[1], objTemp, false);
+    temp = drawObject(info[0], info[1], objTemp, false);
   }
   elements[key] = temp;
   saveLocal(elements, key);

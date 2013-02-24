@@ -13,6 +13,15 @@ function draw_menu() {
     'access arguments' => array('access administration pages'),
     'type' => MENU_NORMAL_ITEM,
   );
+  $items['admin/config/content/drupal_draw/edit_background/%'] = array(
+    'title' => 'Draw create background',
+    'description' => 'Make or edit a background for Draw',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('draw_background_form'),
+    'file' => 'draw.admin.inc',
+    'access arguments' => array('access administration pages'),
+    'type' => MENU_CALLBACK,
+  );
   return $items;
 }
 
@@ -43,14 +52,14 @@ function draw_field_widget_form(&$form, &$form_state, $field, $instance, $langco
   $create_image_uri = 'public://drupal_draw/';
   $path = drupal_get_path('module', 'draw') . '/js/';
   drupal_add_js($path . 'raphael-min.js');
-  drupal_add_js($path . 'volleyball_base.js');
+  drupal_add_js($path . 'editor_base.js');
   drupal_add_js($path . 'draw_basic.js');
   $element['value']= array(
     '#type' => 'textarea', // hidden',
     '#prefix' => '<div id="draw-diagram" data-target_element="' . $textarea_id . '" data-image_path="' . $image_path . '"></div>'
       . '<div style="display: none;">',
     '#attributes' => array('class' => array('draw-diagram-input')),
-    '#suffix' => '</div>',
+    '#suffix' => '</div><div class="draw-view-source">' . t('View source') . '</div>',
   //  '#disabled' => TRUE,
     '#default_value' => empty($items) ? '' : $items[0]['value'],
   );
@@ -107,6 +116,8 @@ function theme_draw_canvas($variables) {
  */
 function draw_preprocess_field(&$variables) {
   if ($variables['field_name_css'] == 'field-diagram') {
+    $draw_settings = variable_get('draw_settings', array('canvas_width' => 400, 'canvas_height' => 640, 'backgrounds' => array()));
+    drupal_add_js(array('draw_settings' => $draw_settings), 'setting');
 
     $nid = $variables['element']['#object']->nid;
     $image_path = drupal_get_path('module', 'draw') . '/images';
@@ -114,6 +125,8 @@ function draw_preprocess_field(&$variables) {
     drupal_add_js($path . 'raphael-min.js');
     drupal_add_js($path . 'draw_fe_render.js');
     drupal_add_js($path . 'draw_basic.js');
+
+
 
     $json = $variables['element']['#items'][0]['value'];
     $variables['element']['#items'][0]['value'] = '<div class="canvas"></div>';

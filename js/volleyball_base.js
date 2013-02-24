@@ -40,7 +40,7 @@ paper = Raphael(document.getElementById("draw-diagram"), 500, 640);
 
 // var i = 0;
 paper.setStart();
-paper.rect(0,0,400,640, 5).attr({"fill": "#ddd"});
+paper.rect(0,0,400,640).attr({"fill": "#eee"});
 
 var court = paper.rect(50,20,300,600);
 court.attr({"fill": "#aaa", "stroke-width": 3});
@@ -81,12 +81,18 @@ var attributes = {
 
 
 if ($(".draw-diagram-input").length > 0) {
+  /*
+  if (typeof Drupal.settings.draw_clipart != undefined) {
+    $.each(Drupal.settings.draw_clipart, function(index, image) {
+      palette[index] = paper.image(image.imagepath, 450, 30, 25, 29);
+      palette[index].attr("title","image");
+    })
+  }
+  */
   palette['player'] = paper.image(image_path + "/player.png", 450, 30, 25, 29);
   palette['player'].attr("title","player");
 
   palette['coach'] = paper.image(image_path + "/coach.png", 410, 30, 25, 29);
-  palette['coach'].attr("fill", "#0fb");
-  palette['coach'].attr("stroke", "#00f");
   palette['coach'].attr("title","coach");
 
   palette['tools'] = [];
@@ -158,23 +164,30 @@ if ($(".draw-diagram-input").length > 0) {
 // Palette functions.
 //palette['ballLine'].drag(drupal_draw_drawing.editor.move, drupal_draw_drawing.editor.start, drupal_draw_drawing.editor.upOrigLine).attr({cursor: "pointer"});
 function palette_tools_select(selected, background){
-  for (var tool in palette["tools"]) {
-    palette["tools"][tool].attr({opacity: "0.6"});
-  }
+  palette_tools_deselect();
   selected.attr({opacity: 1});
   clear_element_events(background);
 }
-
+function palette_tools_deselect() {
+  for (var tool in palette["tools"]) {
+    palette["tools"][tool].attr({opacity: "0.6"});
+  }
+}
 palette["tools"]['vector'].click(function(){
   palette_tools_select(this, bg);
-  bg.click(drupal_draw_drawing.editor.vector_start).attr({cursor: "crosshair"});
+  bg.drag(drupal_draw_drawing.editor.vector_move, drupal_draw_drawing.editor.vector_start, function(e) {
+    drupal_draw_drawing.editor.vector_end(e);
+    bg.undrag();
+    palette_tools_deselect();
+  }); //click(drupal_draw_drawing.editor.vector_start).attr({cursor: "crosshair"});
+  /*
   bg.dblclick(function(e) {
     bg.unclick();
     drupal_draw_drawing.editor.vector_end(e);
     bg.undblclick();
     clear_element_events(this);
   }).attr({cursor: "auto"});
-
+  */
 }).attr({cursor: "pointer"});
 
 palette["tools"]['text'].click(function(){
@@ -297,38 +310,56 @@ drupal_draw_drawing.editor = {
     i++;
     saveLocal(elements);
   },
-  vector_start: function(event) {
+  vector_start: function(mx, my, event) {
     var canvas_offset = $("#draw-diagram").offset();
     var x = event.pageX - canvas_offset.left;
     var y = event.pageY - canvas_offset.top;
     // The object has not been created yet.
-    if (typeof tempObject == "undefined" || tempObject.type != "path") {
+   // if (typeof tempObject == "undefined" || tempObject.type != "path") {
       tempObject = paper.path().attr(current_attributes);
       tempObject.key = "path_" + i;
       i++;
-      tempObject.attr({path: "M" + x + " " + y + " C" + x + " " + y + " " + x + " " + y});
+      tempObject.coord = {x:x,y:y};
+      tempObject.coord_old = {x:x,y:y};
+   //   tempObject.attr({path: "M" + x + " " + y + " C" + x + " " + y + " " + x + " " + y, title: tempObject.key});
+      tempObject.attr({path: "M" + x + "," + y, title: tempObject.key});
 
-    }
+  /*  }
     else {
-      var new_path = tempObject.attr("path") + " " + x + " " + y;
+      drupal_draw_drawing.editor.vector_point_add(event);
+    /*  var new_path = tempObject.attr("path") + " " + x + " " + y;
       tempObject.attr({path: new_path});
+    
     }
+  */
+  },
+  vector_move: function(dx, dy, x, y, event) {
+    dx += tempObject.coord.x;
+    dy += tempObject.coord.y;
+
+    var new_path = "M" + tempObject.coord.x + "," + tempObject.coord.y + "L " + dx + "," + dy;
+    tempObject.attr({path: new_path});
   },
   vector_point_add: function(event) {
     var canvas_offset = $("#draw-diagram").offset();
     var x = event.pageX - canvas_offset.left;
     var y = event.pageY - canvas_offset.top;
+    
 
-    var new_path = tempObject.attr("path") + " " + x + " " + y;
+    var new_path = tempObject.attr("path") + "L" + x + "," + y; //+ tempObject.coord.x + "," + tempObject.coord.y + " " + x + "," + y;
     tempObject.attr({path: new_path});
+    tempObject.coord_old = tempObject.coord;
+    tempObject.coord = {x:x,y:y}
   },
   vector_end: function(event) {
-    drupal_draw_drawing.editor.vector_point_add(event);
+  //  drupal_draw_drawing.editor.vector_point_add(event);
 
     tempObject.attr({"arrow-end": "classic-wide-long"});
     elements[tempObject.key] = tempObject.attr();
     objectsArray[tempObject.key] = tempObject;
     objectsArray[tempObject.key].click(function(){ drupal_draw_drawing.editor.activate_object(this.attr("title")) });
+
+    //tempObject = {};
 
     saveLocal(elements);
   },
@@ -403,9 +434,13 @@ drupal_draw_drawing.editor = {
   },
   rectangle_end: function() {
     bg.undrag().attr({cursor: "default"});
+    /*
     elements["rect_" + i] = tempObject.attr();
+
     i++;
     saveLocal(elements);
+    */
+    drupal_draw_drawing.editor.finishElement(tempObject);
   },
   // Attributes for dragging prototypes
   startOrig: function () {
@@ -448,6 +483,17 @@ drupal_draw_drawing.editor = {
   	this.attr({x: this.ox, y: this.oy, opacity: 1});
     $("body").data("active", this.attr("title") + "_" + i);
     i++;
+  },
+  finishElement: function(element) {
+    var key = element.type + "_" + i;
+    i++;
+    objectsArray[key] = element;
+    objectsArray[key].attr("title", key);
+    elements[key] = element.attr();
+    
+    objectsArray[key].click(function(){ drupal_draw_drawing.editor.activate_object(this.attr("title")) });
+    element = {};
+    saveLocal(elements);
   }
 };
 
