@@ -14,31 +14,26 @@
 
         // var i = 0;
         paper.setStart();
-        paper.rect(0,0,Drupal.settings.draw_settings.canvas_width, Drupal.settings.draw_settings.canvas_height, 5).attr({"fill": "#ddd"});
-        /*
-        var court = paper.rect(50,20,300,600);
-        court.attr({"fill": "#aaa", "stroke-width": 3});
-        court.attr("stroke", "#FFF");
-        var lines = paper.set();
-        lines.push(
-          paper.path("M50 320L350 320"),
-          paper.path("M50 220L350 220"),
-          paper.path("M50 420L350 420")
-        );
-        lines.attr({"stroke":"#FFF", "stroke-width": 3});
-        */
+        paper.rect(0,0,Drupal.settings.draw_settings.canvas_width, Drupal.settings.draw_settings.canvas_height, 5).attr({"fill": "#dedede"});
 
-        
+        var background_content = {};
         if (typeof Drupal.settings.draw["drawing-" + nid] != "undefined") {
           if (typeof Drupal.settings.draw["drawing-" + nid].background != "undefined") {
             var background_id = Drupal.settings.draw["drawing-" + nid].background;
+            background_object = Drupal.settings.draw_settings.backgrounds[background_id];
             delete Drupal.settings.draw["drawing-" + nid].background;
-            
-            for(var index in Drupal.settings.draw_settings.backgrounds['min_baggrund'].content) {
-              var item = Drupal.settings.draw_settings.backgrounds['min_baggrund'].content[index];
-              drawFromJSON(index, item);
+          }
+          else if (typeof Drupal.settings.draw_settings.backgrounds != 'undefined') {
+            for (var background_id in Drupal.settings.draw_settings.backgrounds) {
+              background_object = Drupal.settings.draw_settings.backgrounds[background_id];
+              break;
             }
           }
+          for(var index in background_object.content) {
+            var item = background_object.content[index];
+            drawFromJSON(index, item);
+          }
+
           saved_drawing = Drupal.settings.draw["drawing-" + nid];
         }
         else {

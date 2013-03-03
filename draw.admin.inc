@@ -6,6 +6,8 @@ function draw_admin_form($form, &$form_state) {
   $admin_form = array();
   $draw_settings = variable_get('draw_settings', array('canvas_width' => 400, 'canvas_height' => 640, 'backgrounds' => array()));
 
+
+
   $admin_form['basic'] = array(
     '#type' => 'fieldset',
     '#title' => t('Draw basic settings'),
@@ -26,9 +28,7 @@ function draw_admin_form($form, &$form_state) {
   $path = drupal_get_path('module', 'draw') . '/js/';
   drupal_add_js($path . 'raphael-min.js');
   drupal_add_js($path . 'draw_fe_render.js');
-  drupal_add_js($path . 'draw_basic.js');
-
-  
+  drupal_add_js($path . 'draw_basic.js');  
 
   foreach ($draw_settings['backgrounds'] as $id => $background) {
     $admin_form['backgrounds'][$id] = array(
@@ -48,7 +48,11 @@ function draw_admin_form($form, &$form_state) {
   $admin_form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Save settings'),
-  );  
+  );
+
+    // No backgrounds on the background previews.
+  $draw_settings['backgrounds'] = array('content' => array());
+  drupal_add_js(array('draw_settings' => $draw_settings), 'setting');
 
   return $admin_form;
 }
@@ -74,10 +78,11 @@ function draw_background_form($form, &$form_state) {
   $id = '';
   $content = '';
   $machine_name = '';
+  $title = '';
 
   if (arg(5) != 'new_background') {
     $id = arg(5);
-    $content = $draw_settings['backgrounds'][$id]['content'];
+    $content = json_encode($draw_settings['backgrounds'][$id]['content']);
     $title = $draw_settings['backgrounds'][$id]['title'];
   }
 
@@ -107,6 +112,9 @@ function draw_background_form($form, &$form_state) {
     '#value' => t('Save'),
   );
 
+  // No backgrounds on the background previews.
+  unset($draw_settings['backgrounds']);
+  drupal_add_js(array('draw_settings' => $draw_settings), 'setting');
 
   return $form;
 }
@@ -119,7 +127,7 @@ function draw_background_form_submit($form, &$form_state) {
     $form_state['values']['existing_id'];
 
   $draw_settings['backgrounds'][$machine_name] = array(
-    'content' => $form_state['values']['drawing'],
+    'content' => json_decode($form_state['values']['drawing'], TRUE),
     'title' => $form_state['values']['background_title'],
   );
 

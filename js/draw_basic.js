@@ -74,7 +74,7 @@ function drawLine(objType,no,pData){
 /**
  * Draw generic.
  */
-function drawObject(type, key, attr) {
+function drawObject(type, key, attr, nosave) {
   key = type + "_" + key;
   if (type == "coach" || type == "player") {
     type = "image";
@@ -83,38 +83,23 @@ function drawObject(type, key, attr) {
     type = "path";
   }
   attr.type = type;
-  objectsArray[key] = paper.add([attr]);
-  objectsArray[key].attr({title: key});
-  if (editor_mode) {
-    // Make the object selectable in editor mode.
-    objectsArray[key].click(function() { drupal_draw_drawing.editor.activate_object(this.attr("title")) });
+  if (typeof nosave == 'undefined') {
+    objectsArray[key] = paper.add([attr]);
+    objectsArray[key].attr({title: key});
+    if (editor_mode) {
+      // Make the object selectable in editor mode.
+      objectsArray[key].click(function() { drupal_draw_drawing.editor.activate_object(this.attr("title")) });
+    }
+    return attr;
   }
-
-  return attr;
+  else {
+    paper.add([attr]);
+  }
+  
 }
 /***************
 * Get saved data
 ****************/
-function travLocal(existing_data){
-  for(var key in existing_data){
-    drawFromJSON(key,existing_data[key]);
-  }
-}
-function drawFromJSON(key,jsonstr){
-  var info = key.split("_");
-
-  var objTemp = jsonstr, temp;
-  if(info[0].indexOf("Line") > -1){
-    temp = drawLine(info[0], info[1], objTemp);
-  }
-  else {
-    temp = drawObject(info[0], info[1], objTemp, false);
-  }
-  elements[key] = temp;
-  saveLocal(elements, key);
-  i++;
-}
-
 function saveLocal(objects_array, last_title){
   if (jQuery(".draw-diagram-input").length > 0) {
     // Undo option
@@ -123,5 +108,27 @@ function saveLocal(objects_array, last_title){
       localStorage.undo = JSON.stringify(objects_array);
     }
     jQuery(".draw-diagram-input").val(JSON.stringify(objects_array));
+  }
+}
+function travLocal(existing_data){
+  for(var key in existing_data){
+    drawFromJSON(key,existing_data[key]);
+  }
+}
+function drawFromJSON(key, jsonstr, nosave){
+  var info = key.split("_");
+
+  var objTemp = jsonstr, temp;
+  if(info[0].indexOf("Line") > -1){
+    temp = drawLine(info[0], info[1], objTemp, nosave);
+  }
+  else {
+    temp = drawObject(info[0], info[1], objTemp, nosave);
+  }
+  
+  if (typeof nosave == 'undefined' && editor_mode) { 
+    elements[key] = temp;
+    saveLocal(elements, key);
+    i++;
   }
 }

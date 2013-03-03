@@ -5,55 +5,77 @@ current_attributes = {"stroke-width": 2},
 bounding_box = {},
 drupal_draw_drawing = {};
 (function ($) {
-  /**
-  var drupal_draw_drawing = {
-    attributes: {
-      editor_mode: false
-    },
-    image_path: "/" + $("#draw-diagram").attr("data-image_path"),
-    form_element_name: $("#draw-diagram").attr("data-target_element"),
-    paper: Raphael(document.getElementById("draw-diagram"), 500, 640), //Drupal.settings.draw.width, Drupal.settings.draw.height),
-    palette: {},
-    objectsArray: {},
-    elements: {},
-    i: 0,
-    load_drawing: function(json_data) {
-      if (typeof jsonstr != 'object') {
-        jsonstr = JSON.parse(json_data);
-      }
-      if (json_data.length < 1) {
-        return false;
-      }
-      for(var element_title in saved_drawing) {
-        drawFromJSON(element_title, saved_drawing[element_title]);
-      }
-    }
-
-  };
-  /**/
 $(document).ready(function(){
+  $(".draw-view-source").click(function(){
+    $(this).closest(".field-widget-diagram").find(".draw-input-wrapper").toggle();
+  });
 var image_path = "/" + $("#draw-diagram").attr("data-image_path");
 var form_element_name = $("#draw-diagram").attr("data-target_element");
 editor_mode = (jQuery(".draw-diagram-input").length > 0);
 /*** Draw the court and background ***/
-paper = Raphael(document.getElementById("draw-diagram"), 500, 640);
+paper = Raphael(document.getElementById("draw-diagram"), (Drupal.settings.draw_settings.canvas_width + 100), Drupal.settings.draw_settings.canvas_height);
 
-// var i = 0;
-paper.setStart();
-paper.rect(0,0,400,640).attr({"fill": "#eee"});
+// Set up the backgrounds and background selector.
+var background_object, background_list = {}, background_index = 0, bg;
+if (typeof Drupal.settings.draw_settings.backgrounds != 'undefined') {
+  for (var background_id in Drupal.settings.draw_settings.backgrounds) {
+    paper.setStart();
+    paper.rect(0,0,Drupal.settings.draw_settings.canvas_width, Drupal.settings.draw_settings.canvas_height).attr({"fill": "#eee"});
 
-var court = paper.rect(50,20,300,600);
-court.attr({"fill": "#aaa", "stroke-width": 3});
-court.attr("stroke", "#FFF");
-var lines = paper.set();
-lines.push(
-	paper.path("M50 320L350 320"),
-	paper.path("M50 220L350 220"),
-	paper.path("M50 420L350 420")
-);
-lines.attr({"stroke":"#FFF", "stroke-width": 3});
-var bg = paper.setFinish();
-$("body").data("current_color", "#000");
+    background_object = Drupal.settings.draw_settings.backgrounds[background_id];
+    $(".draw-background-select").append('<option value="' + background_id + '">' + background_object.title + '</option>');
+
+    for(var index in background_object.content) {
+      var item = background_object.content[index];
+      drawFromJSON(index, item, true);
+    }
+
+    background_list[background_id] = paper.setFinish();
+    background_list[background_id].hide();
+
+    if (background_index === 0) {
+      bg = background_list[background_id];
+      background_index++;
+      background_list[background_id].show();
+    }
+  }
+}
+else {
+  paper.setStart();
+  paper.rect(0,0,Drupal.settings.draw_settings.canvas_width, Drupal.settings.draw_settings.canvas_height).attr({"fill": "#eee"});
+/*
+  var court = paper.rect(50,20,300,600);
+  court.attr({"fill": "#aaa", "stroke-width": 3});
+  court.attr("stroke", "#FFF");
+  var lines = paper.set();
+  lines.push(
+  	paper.path("M50 320L350 320"),
+  	paper.path("M50 220L350 220"),
+  	paper.path("M50 420L350 420")
+  );
+  lines.attr({"stroke":"#FFF", "stroke-width": 3});
+*/
+  bg = paper.setFinish();
+}
+
+/*
+for (var b_id in background_list) {
+  bg = background_list[b_id];
+  break;
+}
+*/
+$(".draw-background-select").change(function(){
+  bg = background_list[$(this).val()];
+  /*
+  $.each(background_list, function(index, item){
+    item.hide();
+  });
+  background_list[$(this).val()].show();
+  */
+  drupal_draw_drawing.editor.setBackground($(this).val());
+  elements['background'] = $(this).val();
+  saveLocal(elements, 'background');
+});
 
 /***
 Attributes for the objects in the palette
@@ -89,26 +111,27 @@ if ($(".draw-diagram-input").length > 0) {
     })
   }
   */
-  palette['player'] = paper.image(image_path + "/player.png", 450, 30, 25, 29);
+  var width = Math.round(Drupal.settings.draw_settings.canvas_width);
+  palette['player'] = paper.image(image_path + "/player.png", (width + 50), 30, 25, 29);
   palette['player'].attr("title","player");
 
-  palette['coach'] = paper.image(image_path + "/coach.png", 410, 30, 25, 29);
+  palette['coach'] = paper.image(image_path + "/coach.png", (width + 10), 30, 25, 29);
   palette['coach'].attr("title","coach");
 
   palette['tools'] = [];
-  palette['tools']['text'] = paper.image(image_path + "/type.png", 410, 70, 29, 28);
+  palette['tools']['text'] = paper.image(image_path + "/type.png", (width + 10), 70, 29, 28);
   palette['tools']['text'].attr({"title":"text", opacity: "0.7"});
 
-  palette['tools']['vector'] = paper.image(image_path + "/vector.png", 410, 110, 29, 28);
+  palette['tools']['vector'] = paper.image(image_path + "/vector.png", (width + 10), 110, 29, 28);
   palette['tools']['vector'].attr({"title":"path", opacity: "0.7"});
 
-  palette['tools']['circle'] = paper.image(image_path + "/circle.png", 450, 110, 29, 28);
+  palette['tools']['circle'] = paper.image(image_path + "/circle.png", (width + 50), 110, 29, 28);
   palette['tools']['circle'].attr({"title":"circle", opacity: "0.7"});
 
-  palette['tools']['freehand'] = paper.image(image_path + "/pencil.png", 410, 150, 30, 27);
+  palette['tools']['freehand'] = paper.image(image_path + "/pencil.png", (width + 10), 150, 30, 27);
   palette['tools']['freehand'].attr({"title":"path", opacity: "0.7"});
 
-  palette['tools']['rect'] = paper.image(image_path + "/rectangle.png", 450, 150, 30, 27);
+  palette['tools']['rect'] = paper.image(image_path + "/rectangle.png", (width + 50), 150, 30, 27);
   palette['tools']['rect'].attr({"title":"rect", opacity: "0.7"});
 
 
@@ -116,14 +139,14 @@ if ($(".draw-diagram-input").length > 0) {
   palette['undo'] = paper.image(image_path + "/undo.png", 450, 230, 30, 27);
   palette['undo'].attr({"title":"undo"});
 */
-  palette['trash'] = paper.image(image_path + "/trash.png", 450, 190, 30, 27);
+  palette['trash'] = paper.image(image_path + "/trash.png", (width + 50), 190, 30, 27);
   palette['trash'].attr({"title":"trash"});
 
 /**** Path dashes ****/
   palette['dashes'] = [];
-  palette['dashes']['dash'] = paper.image(image_path + "/pathicon0.png", 410, 270, 29, 28).attr({"stroke-dasharray": ""});
-  palette['dashes']['dash-'] = paper.image(image_path + "/pathicon1.png", 440, 270, 29, 28).attr({"stroke-dasharray": "-", opacity: "0.7"});
-  palette['dashes']['dash--'] = paper.image(image_path + "/pathicon2.png", 470, 270, 30, 27).attr({"stroke-dasharray": "--", opacity: "0.7"});
+  palette['dashes']['dash'] = paper.image(image_path + "/pathicon0.png", width + 10, 270, 29, 28).attr({"stroke-dasharray": ""});
+  palette['dashes']['dash-'] = paper.image(image_path + "/pathicon1.png", width + 40, 270, 29, 28).attr({"stroke-dasharray": "-", opacity: "0.7"});
+  palette['dashes']['dash--'] = paper.image(image_path + "/pathicon2.png", width + 70, 270, 30, 27).attr({"stroke-dasharray": "--", opacity: "0.7"});
 
   for (var dash in palette["dashes"]) {
     palette["dashes"][dash].click(function() {
@@ -139,12 +162,12 @@ if ($(".draw-diagram-input").length > 0) {
 
   /***** Line width ***/
   palette['stroke-width'] = [];
-  palette['stroke-width']['2'] = paper.image(image_path + "/pathicon0.png", 410, 310, 29, 28).attr({"stroke-width": 2});
-  palette['stroke-width']['4'] = paper.image(image_path + "/pathicon0.png", 440, 310, 29, 28).attr({"stroke-width": 4});
-  palette['stroke-width']['6'] = paper.image(image_path + "/pathicon0.png", 470, 310, 29, 28).attr({"stroke-width": 6});
+  palette['stroke-width']['2'] = paper.image(image_path + "/stroke-narrow.png", (width + 10), 310, 29, 28).attr({"stroke-width": 2});
+  palette['stroke-width']['4'] = paper.image(image_path + "/stroke-medium.png", (width + 40), 310, 29, 28).attr({"stroke-width": 4});
+  palette['stroke-width']['6'] = paper.image(image_path + "/stroke-wide.png", (width + 70), 310, 29, 28).attr({"stroke-width": 6});
 
-  for (var width in palette["stroke-width"]) {
-    palette["stroke-width"][width].click(function() {
+  for (var s_width in palette["stroke-width"]) {
+    palette["stroke-width"][s_width].click(function() {
 
       current_attributes["stroke-width"] = this.attr("stroke-width");
       
@@ -157,9 +180,9 @@ if ($(".draw-diagram-input").length > 0) {
 
   /***** Arrows ***/
   palette['arrow-end'] = [];
-  palette['arrow-end']["classic"] = paper.image(image_path + "/pathicon0.png", 410, 350, 29, 28).attr({"arrow-end": "classic-wide-long"});
-  palette['arrow-end']["oval"] = paper.image(image_path + "/pathicon0.png", 440, 350, 29, 28).attr({"arrow-end": "oval-midium-midium"});
-  palette['arrow-end']["none"] = paper.image(image_path + "/pathicon0.png", 470, 350, 29, 28).attr({"arrow-end": "none"});
+  palette['arrow-end']["arrow"] = paper.image(image_path + "/arrow-arrow.png", (width + 10), 350, 29, 28).attr({"arrow-end": "diamond-wide-long"});
+  palette['arrow-end']["oval"] = paper.image(image_path + "/arrow-ball.png", (width + 40), 350, 29, 28).attr({"arrow-end": "oval-wide-long"});
+  palette['arrow-end']["none"] = paper.image(image_path + "/arrow-none.png", (width + 70), 350, 29, 28).attr({"arrow-end": "none"});
 
   for (var arrow in palette["arrow-end"]) {
     palette["arrow-end"][arrow].click(function() {
@@ -175,12 +198,12 @@ if ($(".draw-diagram-input").length > 0) {
 
 /**** Colors ****/
   palette['colors'] = {
-    blue: paper.rect(409, 400, 25, 25).attr({fill : "#77F", stroke: "#000", "stroke-width": 2}),
-    red: paper.rect(442, 400, 25, 25).attr({fill : "#F33", stroke: "#000", "stroke-width": 2}),
-    black: paper.rect(475, 400, 25, 25).attr({fill : "#000", stroke: "#000", "stroke-width": 2}),
-    green: paper.rect(409, 440, 25, 25).attr({fill : "#3F3", stroke: "#000", "stroke-width": 2}),
-    white: paper.rect(442, 440, 25, 25).attr({fill : "#FFF", stroke: "#000", "stroke-width": 2}),
-    grey: paper.rect(475, 440, 25, 25).attr({fill : "#777", stroke: "#000", "stroke-width": 2}),
+    blue: paper.rect((width + 9), 400, 25, 25).attr({fill : "#77F", stroke: "#000", "stroke-width": 2}),
+    red: paper.rect((width + 42), 400, 25, 25).attr({fill : "#F33", stroke: "#000", "stroke-width": 2}),
+    black: paper.rect((width + 75), 400, 25, 25).attr({fill : "#000", stroke: "#000", "stroke-width": 2}),
+    green: paper.rect((width + 9), 440, 25, 25).attr({fill : "#3F3", stroke: "#000", "stroke-width": 2}),
+    white: paper.rect((width + 42), 440, 25, 25).attr({fill : "#FFF", stroke: "#000", "stroke-width": 2}),
+    grey: paper.rect((width + 75), 440, 25, 25).attr({fill : "#777", stroke: "#000", "stroke-width": 2}),
   };
 
   for (var col in palette["colors"]) {
@@ -251,11 +274,17 @@ palette["tools"]['rect'].click(function(){
 }).attr({cursor: "pointer"});
 
 
-
-
 // The temp var. Frequently used below
 var temp;
 drupal_draw_drawing.editor = {
+  setBackground: function(bg_id) {
+    $.each(background_list, function(index, item){
+      item.hide();
+    });
+    $(".draw-background-select").find("option[value='" + bg_id + "']").attr("selected", "selected");
+    background_list[bg_id].show();
+    bg = background_list[bg_id];
+  },
   // Attributes for dragging instances
   start: function () {
       // storing original coordinates
@@ -388,14 +417,10 @@ drupal_draw_drawing.editor = {
     tempObject.coord = {x:x,y:y}
   },
   vector_end: function(event) {
-  //  drupal_draw_drawing.editor.vector_point_add(event);
-
     tempObject.attr();
     elements[tempObject.key] = tempObject.attr();
     objectsArray[tempObject.key] = tempObject;
     objectsArray[tempObject.key].click(function(){ drupal_draw_drawing.editor.activate_object(this.attr("title")) });
-
-    //tempObject = {};
 
     saveLocal(elements);
   },
@@ -567,7 +592,11 @@ palette['trash'].click(function(){
 
 var saved_drawing;
 if ($(".draw-diagram-input").length && $(".draw-diagram-input").val().length > 2) {
-   saved_drawing = JSON.parse($(".draw-diagram-input").val());
+  saved_drawing = JSON.parse($(".draw-diagram-input").val());
+  if (typeof saved_drawing.background != "undefined") {
+    drupal_draw_drawing.editor.setBackground(saved_drawing.background);
+    delete saved_drawing.background;
+  }
 }
 else {
   saved_drawing = {}; //JSON.parse(Drupal.settings.draw.drawing);

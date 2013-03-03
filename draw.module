@@ -54,10 +54,15 @@ function draw_field_widget_form(&$form, &$form_state, $field, $instance, $langco
   drupal_add_js($path . 'raphael-min.js');
   drupal_add_js($path . 'editor_base.js');
   drupal_add_js($path . 'draw_basic.js');
+  $draw_settings = variable_get('draw_settings', array('canvas_width' => 400, 'canvas_height' => 640, 'backgrounds' => array()));
+  drupal_add_js(array('draw_settings' => $draw_settings), 'setting');
+  
   $element['value']= array(
     '#type' => 'textarea', // hidden',
-    '#prefix' => '<div id="draw-diagram" data-target_element="' . $textarea_id . '" data-image_path="' . $image_path . '"></div>'
-      . '<div style="display: none;">',
+    '#prefix' => '<span>' . t('Select background') . '</span>'
+               . '<select class="draw-background-select" id="draw-background-' . $textarea_id . '"></select>'
+               . '<div id="draw-diagram" data-target_element="' . $textarea_id . '" data-image_path="' . $image_path . '"></div>'
+               . '<div class="draw-input-wrapper" style="display: none;">',
     '#attributes' => array('class' => array('draw-diagram-input')),
     '#suffix' => '</div><div class="draw-view-source">' . t('View source') . '</div>',
   //  '#disabled' => TRUE,
@@ -128,7 +133,7 @@ function draw_preprocess_field(&$variables) {
 
 
 
-    $json = $variables['element']['#items'][0]['value'];
+    $json = json_decode($variables['element']['#items'][0]['value'], TRUE);
     $variables['element']['#items'][0]['value'] = '<div class="canvas"></div>';
     $variables['items'][0]['#markup'] = '<div class="draw-canvas" id="draw-diagram-' . $nid .'" data-nid="' . $nid .'" data-image_path="' . $image_path . '"></div>';
     drupal_add_js(array('draw' => array('drawing-' . $nid => $json)), 'setting');
