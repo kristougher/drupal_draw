@@ -1,5 +1,5 @@
 var palette = new Array(),
-tempObject,
+tempObject, tempCurve = {},
 i = 0,
 current_attributes = {"stroke-width": 2},
 bounding_box = {},
@@ -273,7 +273,9 @@ palette["tools"]['rect'].click(function(){
   bg.drag(drupal_draw_drawing.editor.rectangle_draw, drupal_draw_drawing.editor.rectangle_start, drupal_draw_drawing.editor.freehand_end).attr({cursor: "crosshair"});
 }).attr({cursor: "pointer"});
 
-
+function isset(variable) {
+  return (typeof variable != "undefined");
+}
 // The temp var. Frequently used below
 var temp;
 drupal_draw_drawing.editor = {
@@ -317,10 +319,14 @@ drupal_draw_drawing.editor = {
     $("body").data("active", this.attr("title"));
   },
   deactivate_object: function(objKey) {
-    if (typeof objKey != "undefined" && objKey.indexOf("Line") > -1) {
-      objectsArray[objKey][1].attr("opacity", "50%");
-      objectsArray[objKey][2].attr("opacity", 0).hide();
-      objectsArray[objKey][3].attr("opacity", 0).hide();
+    tempCurve = {};
+
+    if (typeof objKey != "undefined" && objKey.indexOf("vector") > -1) {
+      delete tempCurve[0];
+      for(var j in tempCurve) {
+        tempCurve[j].remove();
+        delete tempCurve[j];
+      }
     }
     else if (typeof objectsArray[objKey] != "undefined") {
       objectsArray[objKey].attr({opacity: 1}).undrag();
@@ -330,8 +336,14 @@ drupal_draw_drawing.editor = {
   activate_object: function(objTitle) {
     drupal_draw_drawing.editor.deactivate_object($("body").data("active"));
     $("body").data("active", objTitle);
-    objectsArray[objTitle].attr({opacity: "0.4"}).undrag();
-    objectsArray[objTitle].drag(drupal_draw_drawing.editor.move, drupal_draw_drawing.editor.start, drupal_draw_drawing.editor.up); 
+
+    if (objTitle.indexOf("vector") === -1){
+      objectsArray[objTitle].attr({opacity: "0.4"}).undrag();
+      objectsArray[objTitle].drag(drupal_draw_drawing.editor.move, drupal_draw_drawing.editor.start, drupal_draw_drawing.editor.up); 
+    }
+    else {
+      drupal_draw_drawing.editor.vectorPoints(objTitle); //objTitle);
+    }
   },
   point_add: function(path_object, x, y) {
     var new_path = path_object.attr("path") + " " + x + " " + y;
@@ -382,7 +394,7 @@ drupal_draw_drawing.editor = {
     // The object has not been created yet.
    // if (typeof tempObject == "undefined" || tempObject.type != "path") {
       tempObject = paper.path().attr(current_attributes);
-      tempObject.key = "path_" + i;
+      tempObject.key = "vector_" + i;
       i++;
       tempObject.coord = {x:x,y:y};
       tempObject.coord_old = {x:x,y:y};
@@ -402,7 +414,10 @@ drupal_draw_drawing.editor = {
     dx += tempObject.coord.x;
     dy += tempObject.coord.y;
 
-    var new_path = "M" + tempObject.coord.x + "," + tempObject.coord.y + "L " + dx + "," + dy;
+    var middle_x = (dx + tempObject.coord.x) / 2,
+    middle_y = (dy + tempObject.coord.y) / 2;
+
+    var new_path = "M" + tempObject.coord.x + "," + tempObject.coord.y + "L " + middle_x + "," + middle_y + " " + dx + "," + dy;
     tempObject.attr({path: new_path});
   },
   vector_point_add: function(event) {
@@ -418,6 +433,7 @@ drupal_draw_drawing.editor = {
   },
   vector_end: function(event) {
     tempObject.attr();
+
     elements[tempObject.key] = tempObject.attr();
     objectsArray[tempObject.key] = tempObject;
     objectsArray[tempObject.key].click(function(){ drupal_draw_drawing.editor.activate_object(this.attr("title")) });
@@ -466,7 +482,7 @@ drupal_draw_drawing.editor = {
       //gonna use the title quite a bit
   	var t = this.attr("title");
 
-      objectsArray[t][0].attr("path","M"+objectsArray[t][1].attr("cx")+" "+objectsArray[t][1].attr("cy")+"L"+objectsArray[t][2].attr("cx")+" "+objectsArray[t][2].attr("cy"));
+      objectsArray[t].attr("path","M"+tempCurve[1].attr("cx")+" "+ tempCurve[1].attr("cy")+"L"+objectsArray[t][2].attr("cx")+" "+objectsArray[t][2].attr("cy"));
   },
   pointMoveCurve: function (dx, dy) {
       // move will be called with dx and dy
@@ -475,12 +491,22 @@ drupal_draw_drawing.editor = {
       //gonna use the title quite a bit
       var t = this.attr("title");
 
-      objectsArray[t][0].attr("path","M"+objectsArray[t][1].attr("cx")+" "+objectsArray[t][1].attr("cy")+"C"+objectsArray[t][1].attr("cx")+" "+objectsArray[t][1].attr("cy")+" "+objectsArray[t][2].attr("cx")+" "+objectsArray[t][2].attr("cy")+" "+objectsArray[t][3].attr("cx")+" "+objectsArray[t][3].attr("cy"));
+       objectsArray[t].attr("path","M"
+        +tempCurve[1].attr("cx")+" "+tempCurve[1].attr("cy")
+        +"C"+tempCurve[1].attr("cx")+" "+tempCurve[1].attr("cy")
+        +" "+tempCurve[2].attr("cx")+" "+tempCurve[2].attr("cy")
+        +" "+tempCurve[3].attr("cx")+" "+tempCurve[3].attr("cy"));
   },
   pointUp: function () {
       // restoring state
       this.attr({opacity: this.oop});
-      elements[this.attr("title")] = objectsArray[this.attr("title")][0].attr();
+      var attr = objectsArray[tempCurve[0]].attr();;
+      // Odd difference between loaded and newly created curves.
+      if (isset(attr.items)) {
+        attr = attr[0].attrs;
+      }
+
+      elements[tempCurve[0]] = attr;
       saveLocal(elements);
   },
   rectangle_start: function(x, y) {
@@ -555,6 +581,46 @@ drupal_draw_drawing.editor = {
     objectsArray[key].click(function(){ drupal_draw_drawing.editor.activate_object(this.attr("title")) });
     element = {};
     saveLocal(elements);
+  },
+  /*********
+  * Draw curved line. Requires an attributes-object
+  *********/
+vectorPoints: function(key){
+  // We need pData a lot, so it is abbreviated
+  var p = objectsArray[key].attr("path");
+
+  // Odd difference between newly created and loaded curves.
+  if (isset(p.items)) {
+
+    var x = p[0]["attrs"]["path"][1][1];
+    var y = p[0]["attrs"]["path"][1][2];
+    var x1 = p[0]["attrs"]["path"][1][3];
+    var y1 = p[0]["attrs"]["path"][1][4];
+    var x2 = p[0]["attrs"]["path"][1][5];
+    var y2 = p[0]["attrs"]["path"][1][6];
+  }
+  else {
+    var x = p[0][1];
+    var y = p[0][2];
+    var y1 = p[1][2];
+    var x1 = p[1][1];
+    var y2 = p[2][2];
+    var x2 = p[2][1];
+  }
+
+  tempCurve[0] = key
+  tempCurve[1] = paper.circle(x,y, 7);
+  tempCurve[1].attr({"title": key, "fill": "#F00"});
+  tempCurve[1].drag(drupal_draw_drawing.editor.pointMoveCurve,drupal_draw_drawing.editor.pointStart,drupal_draw_drawing.editor.pointUp);
+
+  tempCurve[2] = paper.circle(x1,y1, 7);
+  tempCurve[2].attr({"title": key, "fill": "#FFF"});
+  tempCurve[2].drag(drupal_draw_drawing.editor.pointMoveCurve,drupal_draw_drawing.editor.pointStart,drupal_draw_drawing.editor.pointUp);
+
+  tempCurve[3] = paper.circle(x2,y2, 7);
+  tempCurve[3].attr({"title": key, "fill": "#FFF"});
+  tempCurve[3].drag(drupal_draw_drawing.editor.pointMoveCurve,drupal_draw_drawing.editor.pointStart,drupal_draw_drawing.editor.pointUp);
+  
   }
 };
 
