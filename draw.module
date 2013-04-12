@@ -50,21 +50,26 @@ function draw_field_widget_form(&$form, &$form_state, $field, $instance, $langco
   $textarea_id = $element['#field_name'] . '[' . $element['#language'] . '][' . $element['#delta'] . '][value]';
   $image_path = drupal_get_path('module', 'draw') . '/images';
   $create_image_uri = 'public://drupal_draw/';
-  $path = drupal_get_path('module', 'draw') . '/js/';
-  drupal_add_js($path . 'raphael-min.js');
-  drupal_add_js($path . 'editor_base.js');
-  drupal_add_js($path . 'draw_basic.js');
+  $path = drupal_get_path('module', 'draw');
+  drupal_add_css($path . '/jquery_draw.css', array('type' => 'file'));
+  drupal_add_js($path . '/js/' . 'raphael-min.js');
+  //drupal_add_js($path . 'editor_base.js');
+  drupal_add_js($path . '/js/' . 'jquery_draw.js');
+ // drupal_add_js($path . 'draw_basic.js');
   $draw_settings = variable_get('draw_settings', array('canvas_width' => 400, 'canvas_height' => 640, 'backgrounds' => array()));
+
   drupal_add_js(array('draw_settings' => $draw_settings), 'setting');
   
+  $inline_js = 'jQuery(document).ready(function(){ jQuery(".draw-diagram-input").raphaelPaper({backgrounds: Drupal.settings.draw_settings.backgrounds }); });';
+
   $element['value']= array(
     '#type' => 'textarea', // hidden',
     '#prefix' => '<span>' . t('Select background') . '</span>'
                . '<select class="draw-background-select" id="draw-background-' . $textarea_id . '"></select>'
-               . '<div id="draw-diagram" data-target_element="' . $textarea_id . '" data-image_path="' . $image_path . '"></div>'
-               . '<div class="draw-input-wrapper" style="display: none;">',
+               . '<div id="draw-diagram" data-target_element="' . $textarea_id . '" data-image_path="' . $image_path . '"></div>',
+    //           . '<div class="draw-input-wrapper" style="display: none;">',
     '#attributes' => array('class' => array('draw-diagram-input')),
-    '#suffix' => '</div><div class="draw-view-source">' . t('View source') . '</div>',
+    //'#suffix' => '</div><div class="draw-view-source">' . t('View source') . '</div>',
   //  '#disabled' => TRUE,
     '#default_value' => empty($items) ? '' : $items[0]['value'],
   );
@@ -126,10 +131,10 @@ function draw_preprocess_field(&$variables) {
 
     $nid = $variables['element']['#object']->nid;
     $image_path = drupal_get_path('module', 'draw') . '/images';
-    $path = drupal_get_path('module', 'draw') . '/js/';
-    drupal_add_js($path . 'raphael-min.js');
-    drupal_add_js($path . 'draw_fe_render.js');
-    drupal_add_js($path . 'draw_basic.js');
+    $path = drupal_get_path('module', 'draw');
+    drupal_add_js($path . '/js/' . 'raphael-min.js');
+    drupal_add_js($path . '/js/' . 'draw_fe_render.js');
+    drupal_add_js($path . '/js/' . 'draw_basic.js');
 
 
 

@@ -1,77 +1,98 @@
-var palette = new Array(),
-tempObject, tempCurve = {},
-i = 0,
-current_attributes = {"stroke-width": 2},
-bounding_box = {},
-drupal_draw_drawing = {};
 (function ($) {
+  var palette = {},
+  tempObject, tempCurve = {},
+  i = 0,
+  current_attributes = {"stroke-width": 2},
+  bounding_box = {},
+  drupal_draw_drawing = {},
+  elements = {},
+  objectsArray = {},
+  background_list = {};
   var paper;
   var temp;
-var editor = {
-  setBackground: function(bg_id) {
-    $.each(background_list, function(index, item){
+  var bg;
+  var editor = {
+    currentObjectID: "",
+  setBackground: function(backgrounds, bg_id, width, height) {
+    if (backgrounds.length < 1) {
+      bg = paper.rect(0, 0, width, height);
+      return;
+    }
+    $.each(backgrounds, function(index, item){
       item.hide();
     });
     $(".draw-background-select").find("option[value='" + bg_id + "']").attr("selected", "selected");
-    background_list[bg_id].show();
+    backgrounds[bg_id].show();
     bg = background_list[bg_id];
   },
   // Attributes for dragging instances
   start: function () {
-      // storing original coordinates
+    if (this.type == "circle") {
+      this.ox = this.attr("cx");
+      this.oy = this.attr("cy");
+    }
+    else {
       this.ox = this.attr("x");
       this.oy = this.attr("y");
-      this.oop = this.attr("opacity");
-      this.attr({opacity: .5});
+    }
+    // storing original coordinates
+    this.oop = this.attr("opacity");
+    this.attr({opacity: .5});
   },
   move: function (dx, dy) {
       // move will be called with dx and dy
+    if (this.type == "circle") {
+      this.attr({cx: (Math.round(this.ox) + dx), cy: (Math.round(this.oy) + dy)});
+    }
+    else {
       this.attr({x: (Math.round(this.ox) + dx), y: (Math.round(this.oy) + dy)});
+    }
   },
   up: function () {
       // restoring state
       this.attr({opacity: this.oop});
       elements[this.attr("title")] = this.attr();
-      saveLocal(elements, this.attr("title"));
+      editor.saveLocal(elements, this.attr("title"));
       this.attr({opacity: 1});
   },
   // Make a line active
   activate_line: function() {
-    if ($("body").data("active").length > 0) {
-      drupal_draw_drawing.editor.deactivate_object($("body").data("active"));
+    if (editor.currentObjectID.length > 0) {
+      editor.deactivate_object($("body").data("active"));
     }
     $("body").data("active", this.attr("title"));
 
     for(var key in objectsArray[this.attr("title")]) {
       objectsArray[this.attr("title")][key].show().attr("opacity", 1);
     }
-    $("body").data("active", this.attr("title"));
+    editor.currentObjectID = this.attr("title");
   },
   deactivate_object: function(objKey) {
-    tempCurve = {};
-
-    if (typeof objKey != "undefined" && objKey.indexOf("vector") > -1) {
+    if (objKey.length > 0 && objKey.indexOf("vector") > -1) {
       delete tempCurve[0];
       for(var j in tempCurve) {
         tempCurve[j].remove();
         delete tempCurve[j];
       }
+      tempCurve = {};
     }
     else if (typeof objectsArray[objKey] != "undefined") {
       objectsArray[objKey].attr({opacity: 1}).undrag();
     }
+    editor.currentObjectID = "";
   },
   // Make an object active
   activate_object: function(objTitle) {
-    drupal_draw_drawing.editor.deactivate_object($("body").data("active"));
-    $("body").data("active", objTitle);
+    editor.deactivate_object(editor.currentObjectID);
+    editor.currentObjectID = objTitle;
 
     if (objTitle.indexOf("vector") === -1){
+      objectsArray[objTitle].op = objectsArray[objTitle].attr("opacity");
       objectsArray[objTitle].attr({opacity: "0.4"}).undrag();
-      objectsArray[objTitle].drag(drupal_draw_drawing.editor.move, drupal_draw_drawing.editor.start, drupal_draw_drawing.editor.up); 
+      objectsArray[objTitle].drag(editor.move, editor.start, editor.up); 
     }
     else {
-      drupal_draw_drawing.editor.vectorPoints(objTitle); //objTitle);
+      editor.vectorPoints(objTitle); //objTitle);
     }
   },
   point_add: function(path_object, x, y) {
@@ -90,10 +111,10 @@ var editor = {
 
         objectsArray[tempObject.key] = tempObject;
         objectsArray[tempObject.key].attr({title: tempObject.key})
-        objectsArray[tempObject.key].click(function(){ drupal_draw_drawing.editor.activate_object(this.attr("title")) });
+        objectsArray[tempObject.key].click(function(){ editor.activate_object(this.attr("title")) });
         elements["text_" + i] = tempObject.attr();
         i++;
-        saveLocal(elements);
+        editor.saveLocal(elements);
         $("#draw-text-input").remove();
         bg.unclick().attr({cursor: "auto"});
       } 
@@ -114,7 +135,7 @@ var editor = {
     bg.undrag().attr({cursor: "default"});
     elements["circle_" + i] = tempObject.attr();
     i++;
-    saveLocal(elements);
+    editor.saveLocal(elements);
   },
   vector_start: function(mx, my, event) {
     var canvas_offset = $("#draw-diagram").offset();
@@ -156,9 +177,9 @@ var editor = {
 
     elements[tempObject.key] = tempObject.attr();
     objectsArray[tempObject.key] = tempObject;
-    objectsArray[tempObject.key].click(function(){ drupal_draw_drawing.editor.activate_object(this.attr("title")) });
+    objectsArray[tempObject.key].click(function(){ editor.activate_object(this.attr("title")) });
 
-    saveLocal(elements);
+    editor.saveLocal(elements);
   },
   freehand_start: function(x, y) {
     tempObject = paper.path().attr(current_attributes);
@@ -179,13 +200,17 @@ var editor = {
   },
   freehand_end: function() {
     bg.undrag().attr({cursor: "default"});
+
+    /*
     objectsArray[tempObject.key] = tempObject;
     objectsArray[tempObject.key].attr("title", tempObject.key);
     elements[tempObject.key] = tempObject.attr();
     
-    objectsArray[tempObject.key].click(function(){ drupal_draw_drawing.editor.activate_object(this.attr("title")) });
+    objectsArray[tempObject.key].click(function(){ editor.activate_object(this.attr("title")) });
 
-    saveLocal(elements);
+    editor.saveLocal(elements);
+    */
+    editor.finishElement(tempObject);
   },
   // Attributes for manipulating lines
   pointStart: function () {
@@ -222,12 +247,12 @@ var editor = {
       this.attr({opacity: this.oop});
       var attr = objectsArray[tempCurve[0]].attr();;
       // Odd difference between loaded and newly created curves.
-      if (isset(attr.items)) {
+      if (editor.isset(attr.items)) {
         attr = attr[0].attrs;
       }
 
       elements[tempCurve[0]] = attr;
-      saveLocal(elements);
+      editor.saveLocal(elements);
   },
   rectangle_start: function(x, y) {
     var canvas_offset = $("#draw-diagram").offset();
@@ -242,7 +267,7 @@ var editor = {
   rectangle_end: function() {
     bg.undrag().attr({cursor: "default"});
 
-    drupal_draw_drawing.editor.finishElement(tempObject);
+    editor.finishElement(tempObject);
   },
   finishElement: function(element) {
     var key = element.type + "_" + i;
@@ -251,9 +276,11 @@ var editor = {
     objectsArray[key].attr("title", key);
     elements[key] = element.attr();
     
-    objectsArray[key].click(function(){ drupal_draw_drawing.editor.activate_object(this.attr("title")) });
+    objectsArray[key].click(function(){ editor.activate_object(this.attr("title")); });
     element = {};
-    saveLocal(elements);
+    editor.activate_object(key);
+    editor.saveLocal(elements);
+
   },
   /*********
   * Draw curved line. Requires an attributes-object
@@ -263,7 +290,7 @@ var editor = {
     var p = objectsArray[key].attr("path");
   
     // Odd difference between newly created and loaded curves.
-    if (isset(p.items)) {
+    if (editor.isset(p.items)) {
   
       var x = p[0]["attrs"]["path"][1][1];
       var y = p[0]["attrs"]["path"][1][2];
@@ -284,26 +311,84 @@ var editor = {
     tempCurve[0] = key
     tempCurve[1] = paper.circle(x,y, 7);
     tempCurve[1].attr({"title": key, "fill": "#F00"});
-    tempCurve[1].drag(drupal_draw_drawing.editor.pointMoveCurve,drupal_draw_drawing.editor.pointStart,drupal_draw_drawing.editor.pointUp);
+    tempCurve[1].drag(editor.pointMoveCurve,editor.pointStart,editor.pointUp);
   
     tempCurve[2] = paper.circle(x1,y1, 7);
     tempCurve[2].attr({"title": key, "fill": "#FFF"});
-    tempCurve[2].drag(drupal_draw_drawing.editor.pointMoveCurve,drupal_draw_drawing.editor.pointStart,drupal_draw_drawing.editor.pointUp);
+    tempCurve[2].drag(editor.pointMoveCurve,editor.pointStart,editor.pointUp);
   
     tempCurve[3] = paper.circle(x2,y2, 7);
     tempCurve[3].attr({"title": key, "fill": "#FFF"});
-    tempCurve[3].drag(drupal_draw_drawing.editor.pointMoveCurve,drupal_draw_drawing.editor.pointStart,drupal_draw_drawing.editor.pointUp);
-  }
+    tempCurve[3].drag(editor.pointMoveCurve,editor.pointStart,editor.pointUp);
+  },
+  drawObject: function (type, key, attr, nosave) {
+    key = type + "_" + key;
+    if (type == "coach" || type == "player") {
+      type = "image";
+    }
+    if (type == "freehand" || type == "vector") {
+      type = "path";
+    }
+    attr.type = type;
+    if (typeof nosave == 'undefined') {
+      objectsArray[key] = paper.add([attr]);
+      objectsArray[key].attr({title: key});
+      objectsArray[key].click(function() { editor.activate_object(this.attr("title")) });
+      return attr;
+    }
+    else {
+      paper.add([attr]);
+    }
+    
+  },
+  drawFromJSON: function (key, jsonstr, nosave){
+    var info = key.split("_");
+
+    var objTemp = jsonstr, temp;
+    temp = editor.drawObject(info[0], info[1], objTemp, nosave);
+
+    if (typeof nosave == 'undefined') { 
+      elements[key] = temp;
+      editor.saveLocal(elements, key);
+      i++;
+    }
+  },
+  /*
+  saveLocal: function  (objects_array, last_title){
+    if (jQuery(".draw-diagram-input").length > 0) {
+      // Undo option
+      jQuery("body").data("draw_latest", last_title)
+      if(typeof localStorage !=="undefined") {
+        localStorage.undo = JSON.stringify(objects_array);
+      }
+      jQuery(".draw-diagram-input").val(JSON.stringify(objects_array));
+    }
+  },
+  */
+  saveLocal: function (objects_array, last_title, storage_selector){
+    $("body").data("draw_latest", last_title)
+    // Undo option
+    if(typeof localStorage !=="undefined") {
+      localStorage.undo = JSON.stringify($(".draw-input-wrapper textarea").val());
+    }
+    $(".draw-input-wrapper textarea").val(JSON.stringify(objects_array));
+  },
+  isset: function (variable) {
+      return (typeof variable != "undefined");
+    }
 };
 
   
   $.fn.raphaelPaper = function(options) {
-    var image_path = "../images";
+
+    var image_path = "/" + $("#draw-diagram").data("image_path"); // "../images";
+    console.log(image_path);
     var settings = $.extend({
       canvas_width: 400,
       canvas_height: 640,
       backgrounds: {},
       image_palette: {},
+      // Tools regarding the attributes of the drawn object.
       attr_tools: {
         "stroke-dasharray": {
           " ": image_path + "/pathicon0.png",
@@ -321,17 +406,81 @@ var editor = {
           "none": image_path + "/arrow-none.png"
         }
       },
-      stroke: {
+      stroke: [
         "#77F", "#F33", "#000", "#3F3", "#FFF", "#777"
-      },
-      fill: {
+      ],
+      fill: [
         "#77F", "#F33", "#000", "#3F3", "#FFF", "#777"
+      ],
+      tools: {
+        texttool: { 
+          icon_url: image_path + "/type.png",
+          action: function() {
+            bg.click(function(e) {
+              editor.text_start(e);
+
+              clear_element_events(this);
+            }).attr({cursor: "text"});
+          }
+        },
+        vector: {
+          icon_url: image_path + "/vector.png",
+          action: function(){
+            bg.drag(editor.vector_move, editor.vector_start, function(e) {
+              editor.vector_end(e);
+              bg.undrag();
+            }); //click(editor.vector_start).attr({cursor: "crosshair"});
+          }
+        },
+        circle: {
+          icon_url: image_path + "/circle.png",
+          action: function(){
+            bg.drag(editor.circle_draw, editor.circle_start, editor.freehand_end).attr({cursor: "crosshair"});
+          }
+        },
+        freehand: {
+          icon_url: image_path + "/pencil.png",
+          action: function(){
+            bg.drag(editor.freehand_draw, editor.freehand_start, editor.freehand_end).attr({cursor: "crosshair"});
+          }
+        },
+        rect: {
+          icon_url: image_path + "/rectangle.png",
+          action: function(){
+            bg.drag(editor.rectangle_draw, editor.rectangle_start, editor.freehand_end).attr({cursor: "crosshair"});
+          }
+        },
+        trash: {
+          icon_url: image_path + "/trash.png",
+          action: function(){
+            // Lines are actually 3 objects. They all need to be removed.
+            if($("body").data("active").indexOf("Line") > -1) {
+              for (var j in objectsArray[$("body").data("active")]) {
+                objectsArray[$("body").data("active")][j].remove();
+              }
+            }
+            else {
+              // Other objects.
+              objectsArray[$("body").data("active")].remove();
+            }
+            // Delete the data of the object.
+            delete objectsArray[$("body").data("active")];
+            delete elements[$("body").data("active")];
+            editor.saveLocal(elements);
+            $("body").data("active", "");
+          }
+        }
       }
+    /*
+    palette['undo'] = paper.image(image_path + "/undo.png", 450, 230, 30, 27);
+    palette['undo'].attr({"title":"undo"});
+    */
     }, options);
     // Setting up the required markup around the widget.
     this.wrap('<div class="draw-widget-diagram"></div>');
     this.wrap('<div class="draw-input-wrapper"></div>');
-    this.closest(".draw-widget-diagram").append('<div class="draw-view-source"></div>');
+    this.closest(".draw-widget-diagram").append('<div class="draw-view-source">View source</div>');
+    this.closest(".draw-widget-diagram").prepend('<div id="draw-tools-palette"></div>');
     this.closest(".draw-widget-diagram").prepend('<div id="draw-image-palette"></div>');
     this.closest(".draw-widget-diagram").prepend('<div id="draw-diagram"></div>');
 
@@ -341,169 +490,131 @@ var editor = {
     });
     
     // Where it all happens. Initiating the paper.
-    paper = Raphael(document.getElementById("draw-diagram"), (settings.canvas_width + 100), settings.canvas_height);
-    
-    // Setting up the toolboxes. First the images to be used.
+    paper = Raphael(document.getElementById("draw-diagram"), settings.canvas_width, settings.canvas_height);
+    var palette = {tools: []}, width = settings.canvas_width;
+
+    // Setting up the toolboxes. 
+    // First the images to be used.
     $.each(settings.image_palette, function(index, item) {
-      $("#draw-image-palette").append('<div class="draw-clipart" id="draw-' + index + '" style="background-image: ' + item + '"></div>');
-    }
-    // Assigning functionality to image palette.
-    $("#draw-image-palette").click(function(){
-      
+      $("#draw-image-palette").append('<div class="draw-clipart" id="draw-' + index + '" style="background-image: ' + item + '"></div>').click(function(){
+        objectsArray[index + "_" + i] = paper.image(item.url, (settings.canvas_width / 2), (settings.canvas_height / 2), item.width, item.height);
+        objectsArray[index + "_" + i].click(function() {
+        }).drag(move, start, up);
+      });
     });
+
+    // Drawing tools.
+    $("#draw-tools-palette").append('<div class="draw-tool-section draw-tools" data-attr="type"></div>');
+    $.each(settings.tools, function(index, item) {
+      $(".draw-tools").append('<div class="draw-tool-icon ' + index + '" style="background-image: url(' + item.icon_url + ');">' + index + '</div>');
+      $(".draw-tools ." + index).click(function(){
+        item.action();
+        $(this).parent().find(".draw-tool-icon").css("opacity", "0.5");
+        $(this).css("opacity", 1);
+        clear_element_events(bg);
+      });
+    });
+
+    var this_section;
+    // Attribute tools
+    $.each(settings.attr_tools, function(index, item) {
+      this_section = '<div class="draw-tool-section draw-' + index + '" data-attr="' + index + '">';
+      $.each(item, function(attr_value, icon_url) {
+        this_section += '<div class="draw-tool-icon" style="background-image: url(' + icon_url + ');">' + attr_value + '</div>'; 
+      });
+
+      this_section += '</div>';
+      $("#draw-tools-palette").append(this_section);
+    });
+
+    // Assign stroke palette.
+    this_section = '<div class="draw-tool-section draw-stroke" data-attr="stroke">';
+    $.each(settings.stroke, function(index, item) {
+      this_section += '<div class="draw-tool-icon" style="border: 2px solid ' + item + '">' + item + '</div>';
+    });
+    $("#draw-tools-palette").append(this_section);
+
+    // Fill palette
+    this_section = '<div class="draw-tool-section draw-fill" data-attr="fill">';
+    $.each(settings.stroke, function(index, item) {
+      this_section += '<div class="draw-tool-icon" style="background: ' + item + '">' + item + '</div>';
+    });
+    $("#draw-tools-palette").append(this_section);
+    delete this_section;
     
-    var width = settings.canvas_width);
+    $("#draw-tools-palette .draw-tool-icon").bind("click", function(){
+      current_attributes[$(this).parent().data("attr")] = $(this).text();
 
-    palette['tools'] = [];
-    palette['tools']['text'] = paper.image(image_path + "/type.png", (width + 10), 70, 29, 28);
-    palette['tools']['text'].attr({"title":"text", opacity: "0.7"});
-  
-    palette['tools']['vector'] = paper.image(image_path + "/vector.png", (width + 10), 110, 29, 28);
-    palette['tools']['vector'].attr({"title":"path", opacity: "0.7"});
-  
-    palette['tools']['circle'] = paper.image(image_path + "/circle.png", (width + 50), 110, 29, 28);
-    palette['tools']['circle'].attr({"title":"circle", opacity: "0.7"});
-  
-    palette['tools']['freehand'] = paper.image(image_path + "/pencil.png", (width + 10), 150, 30, 27);
-    palette['tools']['freehand'].attr({"title":"path", opacity: "0.7"});
-  
-    palette['tools']['rect'] = paper.image(image_path + "/rectangle.png", (width + 50), 150, 30, 27);
-    palette['tools']['rect'].attr({"title":"rect", opacity: "0.7"});
-    
-    /*
-  palette['undo'] = paper.image(image_path + "/undo.png", 450, 230, 30, 27);
-  palette['undo'].attr({"title":"undo"});
-*/
-    palette['trash'] = paper.image(image_path + "/trash.png", (width + 50), 190, 30, 27);
-    palette['trash'].attr({"title":"trash"});
+      // If there is an active object, assign the attribute to it.
+      if (editor.currentObjectID.length > 0) {
+        objectsArray[editor.currentObjectID].attr($(this).parent().data("attr"), $(this).text());
+        elements[editor.currentObjectID] = objectsArray[editor.currentObjectID].attr();
+        editor.saveLocal(elements);
+      }
+    });
 
+    // Set up the backgrounds and background selector.
+    var background_object, background_list = {}, background_index = 0;
+    if (typeof settings.backgrounds != 'undefined' && settings.backgrounds.length > 0) {
+      for (var background_id in Drupal.settings.draw_settings.backgrounds) {
+        paper.setStart();
+        paper.rect(0,0,settings.canvas_width, settings.canvas_height).attr({"fill": "#eee"});
 
-  };
-$(document).ready(function(){
+        background_object = Drupal.settings.draw_settings.backgrounds[background_id];
+        $(".draw-background-select").append('<option value="' + background_id + '">' + background_object.title + '</option>');
 
-
-if ($(".draw-diagram-input").length > 0) {
-  /*
-  if (typeof Drupal.settings.draw_clipart != undefined) {
-    $.each(Drupal.settings.draw_clipart, function(index, image) {
-      palette[index] = paper.image(image.imagepath, 450, 30, 25, 29);
-      palette[index].attr("title","image");
-    })
-  }
-  */
-  
-
-
-
-  var toolbox = paper.set();
-  toolbox.push(palette['coach'],palette['player']);
-
-// Palette functions.
-//palette['ballLine'].drag(drupal_draw_drawing.editor.move, drupal_draw_drawing.editor.start, drupal_draw_drawing.editor.upOrigLine).attr({cursor: "pointer"});
-function palette_tools_select(selected, background){
-  palette_tools_deselect();
-  selected.attr({opacity: 1});
-  clear_element_events(background);
-}
-function palette_tools_deselect() {
-  for (var tool in palette["tools"]) {
-    palette["tools"][tool].attr({opacity: "0.6"});
-  }
-}
-palette["tools"]['vector'].click(function(){
-  palette_tools_select(this, bg);
-  bg.drag(drupal_draw_drawing.editor.vector_move, drupal_draw_drawing.editor.vector_start, function(e) {
-    drupal_draw_drawing.editor.vector_end(e);
-    bg.undrag();
-    palette_tools_deselect();
-  }); //click(drupal_draw_drawing.editor.vector_start).attr({cursor: "crosshair"});
-  /*
-  bg.dblclick(function(e) {
-    bg.unclick();
-    drupal_draw_drawing.editor.vector_end(e);
-    bg.undblclick();
-    clear_element_events(this);
-  }).attr({cursor: "auto"});
-  */
-}).attr({cursor: "pointer"});
-
-palette["tools"]['text'].click(function(){
-  palette_tools_select(this, bg);
-  bg.click(function(e) {
-    drupal_draw_drawing.editor.text_start(e);
-
-    clear_element_events(this);
-  }).attr({cursor: "text"});
-}).attr({cursor: "pointer"});
-
-palette["tools"]['circle'].click(function(){
-  palette_tools_select(this, bg);
-  bg.drag(drupal_draw_drawing.editor.circle_draw, drupal_draw_drawing.editor.circle_start, drupal_draw_drawing.editor.freehand_end).attr({cursor: "crosshair"});
-}).attr({cursor: "pointer"});
-
-palette["tools"]['freehand'].click(function(){
-  palette_tools_select(this, bg);
-  bg.drag(drupal_draw_drawing.editor.freehand_draw, drupal_draw_drawing.editor.freehand_start, drupal_draw_drawing.editor.freehand_end).attr({cursor: "crosshair"});
-}).attr({cursor: "pointer"});
-
-palette["tools"]['rect'].click(function(){
-  palette_tools_select(this, bg);
-  bg.drag(drupal_draw_drawing.editor.rectangle_draw, drupal_draw_drawing.editor.rectangle_start, drupal_draw_drawing.editor.freehand_end).attr({cursor: "crosshair"});
-}).attr({cursor: "pointer"});
-
-function isset(variable) {
-  return (typeof variable != "undefined");
-}
-// The temp var. Frequently used below
-
-toolbox.drag(drupal_draw_drawing.editor.moveOrig, drupal_draw_drawing.editor.startOrig, drupal_draw_drawing.editor.upOrig).attr({cursor: "pointer"});
-
-function clear_element_events(element) {
-  if (typeof element.events == "undefined") {
-    return false;
-  }
-  while(element.events.length){          
-            var e = element.events.pop();
-            e.unbind();
+        for(var index in background_object.content) {
+          var item = background_object.content[index];
+          drawFromJSON(index, item, true);
         }
-}
 
-palette['trash'].click(function(){
-  // Lines are actually 3 objects. They all need to be removed.
-  if($("body").data("active").indexOf("Line") > -1) {
-    for (var j in objectsArray[$("body").data("active")]) {
-      objectsArray[$("body").data("active")][j].remove();
+        background_list[background_id] = paper.setFinish();
+        background_list[background_id].hide();
+
+        if (background_index === 0) {
+          bg = background_list[background_id];
+          background_index++;
+          background_list[background_id].show();
+        }
+      }
     }
-  }
-  else {
-    // Other objects.
-    objectsArray[$("body").data("active")].remove();
-  }
-  // Delete the data of the object.
-  delete objectsArray[$("body").data("active")];
-  delete elements[$("body").data("active")];
-  saveLocal(elements);
-  $("body").data("active", "");
-});
+    else {
+      paper.setStart();
+      paper.rect(0,0, settings.canvas_width, settings.canvas_height).attr({"fill": "#fefefe"});
 
-}
+      bg = paper.setFinish();
+    }
 
-var saved_drawing;
-if ($(".draw-diagram-input").length && $(".draw-diagram-input").val().length > 2) {
-  saved_drawing = JSON.parse($(".draw-diagram-input").val());
-  if (typeof saved_drawing.background != "undefined") {
-    drupal_draw_drawing.editor.setBackground(saved_drawing.background);
-    delete saved_drawing.background;
-  }
-}
-else {
-  saved_drawing = {}; //JSON.parse(Drupal.settings.draw.drawing);
-}
-if (typeof saved_drawing != "undefined") {
-  for(var element_title in saved_drawing) {
-    drawFromJSON(element_title, saved_drawing[element_title]);
-  }
-}
-$("body").data("active", "");
-});
+    
+    function clear_element_events(element) {
+      if (typeof element.events == "undefined") {
+        return false;
+      }
+      while(element.events.length){          
+                var e = element.events.pop();
+                e.unbind();
+            }
+    }
+
+    var saved_drawing;
+    if (this.val().length > 2) {
+      saved_drawing = JSON.parse($(".draw-diagram-input").val());
+      if (typeof saved_drawing.background != "undefined") {
+        delete saved_drawing.background;
+      }
+    }
+    else {
+      saved_drawing = {};
+    }
+    if (typeof saved_drawing != "undefined") {
+      for(var element_title in saved_drawing) {
+        editor.drawFromJSON(element_title, saved_drawing[element_title]);
+      }
+    }
+
+    $("body").data("active", "");
+  };
+  $(document).ready(function(){
+    $(".draw-diagram-input").raphaelPaper({backgrounds: Drupal.settings.draw_settings.backgrounds });
+  });
 })(jQuery);

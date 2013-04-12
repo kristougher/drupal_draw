@@ -32,19 +32,7 @@ function drawObject(type, key, attr, nosave) {
     type = "path";
   }
   attr.type = type;
-  if (typeof nosave == 'undefined') {
-    objectsArray[key] = paper.add([attr]);
-    objectsArray[key].attr({title: key});
-    if (editor_mode) {
-      // Make the object selectable in editor mode.
-      objectsArray[key].click(function() { drupal_draw_drawing.editor.activate_object(this.attr("title")) });
-    }
-    return attr;
-  }
-  else {
-    paper.add([attr]);
-  }
-  
+  paper.add([attr]);
 }
 /***************
 * Get saved data
