@@ -13,17 +13,14 @@
   var bg;
   var editor = {
     currentObjectID: "",
-  setBackground: function(backgrounds, bg_id, width, height) {
-    if (backgrounds.length < 1) {
-      bg = paper.rect(0, 0, width, height);
-      return;
-    }
+  setBackground: function(backgrounds, bg_id) {
     $.each(backgrounds, function(index, item){
       item.hide();
     });
-    $(".draw-background-select").find("option[value='" + bg_id + "']").attr("selected", "selected");
     backgrounds[bg_id].show();
-    bg = background_list[bg_id];
+    bg = backgrounds[bg_id];
+    elements['background'] = bg_id;
+    editor.saveLocal(elements, 'background');
   },
   // Attributes for dragging instances
   start: function () {
@@ -555,17 +552,18 @@
 
     // Set up the backgrounds and background selector.
     var background_object, background_list = {}, background_index = 0;
-    if (typeof settings.backgrounds != 'undefined' && settings.backgrounds.length > 0) {
-      for (var background_id in Drupal.settings.draw_settings.backgrounds) {
+    if (typeof settings.backgrounds != 'undefined') {
+      // Iterate through backgrounds.
+      for (var background_id in settings.backgrounds) {
         paper.setStart();
-        paper.rect(0,0,settings.canvas_width, settings.canvas_height).attr({"fill": "#eee"});
+        paper.rect(0,0,settings.canvas_width, settings.canvas_height).attr({"fill": "#fefefe"});
 
-        background_object = Drupal.settings.draw_settings.backgrounds[background_id];
+        background_object = settings.backgrounds[background_id];
         $(".draw-background-select").append('<option value="' + background_id + '">' + background_object.title + '</option>');
 
         for(var index in background_object.content) {
           var item = background_object.content[index];
-          drawFromJSON(index, item, true);
+          editor.drawFromJSON(index, item, true);
         }
 
         background_list[background_id] = paper.setFinish();
@@ -577,6 +575,7 @@
           background_list[background_id].show();
         }
       }
+      $(".draw-background-select").change(function() { editor.setBackground(background_list, $(this).val()) });
     }
     else {
       paper.setStart();
@@ -600,6 +599,8 @@
     if (this.val().length > 2) {
       saved_drawing = JSON.parse($(".draw-diagram-input").val());
       if (typeof saved_drawing.background != "undefined") {
+        editor.setBackground(background_list, saved_drawing.background);
+        $(".draw-background-select").find("[value='" + saved_drawing.background + "']").attr("selected", "selected");
         delete saved_drawing.background;
       }
     }
