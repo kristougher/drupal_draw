@@ -41,6 +41,7 @@
     bbox.set.transform(this.transform());
 
     editor.bbox_hide();
+    bbox.move = {};
 
     // storing original coordinates
     this.oop = this.attr("opacity");
@@ -68,9 +69,10 @@
       editor.saveLocal(elements, editor.currentObjectID);
   },
   up: function () {
-      
-      this.transform(bbox.transform_storage + "T" + bbox.move.x + "," + bbox.move.y); // bbox.set.transform());
-
+      if (editor.isset(bbox.move.x)) {
+        this.transform(bbox.transform_storage + "T" + bbox.move.x + "," + bbox.move.y); // bbox.set.transform());
+      }
+      bbox.move = {};
       this.attr({opacity: this.oop});
       elements[this.attr("title")] = this.attr();
       editor.saveLocal(elements, this.attr("title"));
@@ -178,6 +180,31 @@
     bbox.move = {scale: (bbox.drag.new_size/bbox.drag.original_size)};
   },
   bbox_resize_end: function() {
+    objectsArray[editor.currentObjectID].transform(bbox.transform_storage + "s" + bbox.move.scale);
+    
+    elements[editor.currentObjectID] = objectsArray[editor.currentObjectID][0].attr();
+    editor.saveLocal(elements, editor.currentObjectID);
+    editor.activate_object(editor.currentObjectID);
+  },
+  bbox_rotate_start: function() {
+    bbox.drag = {
+      x: Math.round(bbox.rect.attr("x")),
+      y: Math.round(bbox.rect.attr("y")),
+      x2: Math.round(bbox.rect.attr("x") + bbox.rect.attr("width")),
+      y2: Math.round(bbox.rect.attr("y") + bbox.rect.attr("height"))
+    };
+
+    editor.bbox_hide();
+  },
+  bbox_rotate_move: function(dx, dy) {
+    var newsqx = Math.pow((bbox.drag.x + dx) - bbox.drag.x2, 2);
+    var newsqy = Math.pow((bbox.drag.y + dy) - bbox.drag.y2, 2);
+    Math.acos();
+    bbox.drag.new_size = Math.sqrt(newsqx + newsqy);
+    objectsArray[editor.currentObjectID].transform(bbox.transform_storage + "s" + (bbox.drag.new_size/bbox.drag.original_size));
+    bbox.move = {scale: (bbox.drag.new_size/bbox.drag.original_size)};
+  },
+  bbox_rotate_end: function() {
     objectsArray[editor.currentObjectID].transform(bbox.transform_storage + "s" + bbox.move.scale);
     
     elements[editor.currentObjectID] = objectsArray[editor.currentObjectID][0].attr();
