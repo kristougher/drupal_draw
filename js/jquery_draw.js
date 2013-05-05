@@ -3,7 +3,7 @@
   tempObject, tempCurve = {},
   i = 0,
   current_attributes = {"stroke-width": 2},
-  bounding_box = {},
+  bbox = {},
   drupal_draw_drawing = {},
   elements = {},
   objectsArray = {},
@@ -13,14 +13,16 @@
   var bg;
   var editor = {
     currentObjectID: "",
-  setBackground: function(backgrounds, bg_id) {
+  setBackground: function(backgrounds, bg_id, nosave) {
     $.each(backgrounds, function(index, item){
       item.hide();
     });
     backgrounds[bg_id].show();
     bg = backgrounds[bg_id];
-    elements['background'] = bg_id;
-    editor.saveLocal(elements, 'background');
+    if (typeof nosave != "undefined" && !nosave) {
+      elements['background'] = bg_id;
+      editor.saveLocal(elements, 'background');
+    }
   },
   // Attributes for dragging instances
   start: function () {
@@ -32,25 +34,46 @@
       this.ox = this.attr("x");
       this.oy = this.attr("y");
     }
+    bbox.ox = bbox.rect.attr("x");
+    bbox.oy = bbox.rect.attr("y");
+    // Store the transform object.
+    bbox.transform_storage = this.transform();
+    bbox.set.transform(this.transform());
+
+    editor.bbox_hide();
+
     // storing original coordinates
     this.oop = this.attr("opacity");
-    this.attr({opacity: .5});
   },
   move: function (dx, dy) {
       // move will be called with dx and dy
     if (this.type == "circle") {
-      this.attr({cx: (Math.round(this.ox) + dx), cy: (Math.round(this.oy) + dy)});
+    //  this.attr({cx: (Math.round(this.ox) + dx), cy: (Math.round(this.oy) + dy)});
     }
     else {
-      this.attr({x: (Math.round(this.ox) + dx), y: (Math.round(this.oy) + dy)});
+     // this.attr({x: (Math.round(this.ox) + dx), y: (Math.round(this.oy) + dy)});
+     // this.transform("t" + dx + "," + dy);
     }
+
+    bbox.set.transform(bbox.transform_storage + "T" + (dx) + "," + (dy));
+    bbox.move = {x: dx, y: dy};
+  },
+  up_trash: function () {
+      
+      objectsArray[editor.currentObjectID].transform(bbox.transform_storage + "t" + bbox.move.x + "," + bbox.move.y); // bbox.set.transform());
+
+      objectsArray[editor.currentObjectID].attr({opacity: this.oop});
+
+      elements[editor.currentObjectID] = objectsArray[editor.currentObjectID].attr();
+      editor.saveLocal(elements, editor.currentObjectID);
   },
   up: function () {
-      // restoring state
+      
+      this.transform(bbox.transform_storage + "T" + bbox.move.x + "," + bbox.move.y); // bbox.set.transform());
+
       this.attr({opacity: this.oop});
       elements[this.attr("title")] = this.attr();
       editor.saveLocal(elements, this.attr("title"));
-      this.attr({opacity: 1});
   },
   // Make a line active
   activate_line: function() {
@@ -76,6 +99,11 @@
     else if (typeof objectsArray[objKey] != "undefined") {
       objectsArray[objKey].attr({opacity: 1}).undrag();
     }
+    if (editor.isset(bbox.set)) {
+      bbox.set.pop();
+      bbox.set.hide();
+      bbox.set.transform("");
+    }
     editor.currentObjectID = "";
   },
   // Make an object active
@@ -86,11 +114,75 @@
     if (objTitle.indexOf("vector") === -1){
       objectsArray[objTitle].op = objectsArray[objTitle].attr("opacity");
       objectsArray[objTitle].attr({opacity: "0.4"}).undrag();
+      // If the bounding box object is not yet set, create it.
+      if (!editor.isset(bbox.rect)) {
+        editor.bbox_create();
+      }
+      editor.bbox_enable(objectsArray[objTitle]); 
+
       objectsArray[objTitle].drag(editor.move, editor.start, editor.up); 
     }
     else {
-      editor.vectorPoints(objTitle); //objTitle);
+      editor.vectorPoints(objTitle);
     }
+  },
+  bbox_create: function() {
+    paper.setStart();
+    bbox.rect = paper.rect(0,0,1,1).attr({opacity: .3,"stroke-dasharray": "-", opacity: 0.1});
+    bbox.rotate = paper.circle(0,0,3);
+    bbox.resize = paper.rect(-15, -15, 15, 15).attr({fill: "#efefef"});
+    bbox.set = paper.setFinish();
+    bbox.set.hide();
+  //  bbox.rect.drag(editor.move, editor.start, editor.up);
+    bbox.resize.drag(editor.bbox_resize_move, editor.bbox_resize_start, editor.bbox_resize_end);
+  },
+  bbox_hide: function() {
+    bbox.rect.hide();
+    bbox.rotate.hide();
+    bbox.resize.hide();
+  },
+  bbox_show: function() {
+    bbox.rect.show();
+    bbox.rotate.show();
+    bbox.resize.show();
+  },
+  bbox_enable: function($object) {
+
+    bbox.coords = $object.getBBox();
+    bbox.set.attr({x: bbox.coords.x, y: bbox.coords.y}).toFront(); //, transform: $object.transform()});
+    bbox.set.push($object);
+    
+    bbox.rect.attr({width: bbox.coords.width, height: bbox.coords.height});
+    bbox.rotate.attr({cx: (bbox.coords.x + bbox.coords.width), cy: (bbox.coords.y + bbox.coords.height)});
+    bbox.set.show();
+  },
+  bbox_resize_start: function() {
+    bbox.drag = {
+      x: Math.round(bbox.rect.attr("x")),
+      y: Math.round(bbox.rect.attr("y")),
+      x2: Math.round(bbox.rect.attr("x") + bbox.rect.attr("width")),
+      y2: Math.round(bbox.rect.attr("y") + bbox.rect.attr("height"))
+    };
+    var sqx = Math.pow(bbox.drag.x - bbox.drag.x2, 2), sqy = Math.pow(bbox.drag.y - bbox.drag.y2, 2);
+    bbox.drag.original_size = Math.sqrt(sqx + sqy);
+    console.log(objectsArray[editor.currentObjectID][0]);
+    bbox.transform_storage = objectsArray[editor.currentObjectID][0].transform();
+
+    editor.bbox_hide();
+  },
+  bbox_resize_move: function(dx, dy) {
+    var newsqx = Math.pow((bbox.drag.x + dx) - bbox.drag.x2, 2);
+    var newsqy = Math.pow((bbox.drag.y + dy) - bbox.drag.y2, 2);
+    bbox.drag.new_size = Math.sqrt(newsqx + newsqy);
+    objectsArray[editor.currentObjectID].transform(bbox.transform_storage + "s" + (bbox.drag.new_size/bbox.drag.original_size));
+    bbox.move = {scale: (bbox.drag.new_size/bbox.drag.original_size)};
+  },
+  bbox_resize_end: function() {
+    objectsArray[editor.currentObjectID].transform(bbox.transform_storage + "s" + bbox.move.scale);
+    
+    elements[editor.currentObjectID] = objectsArray[editor.currentObjectID][0].attr();
+    editor.saveLocal(elements, editor.currentObjectID);
+    editor.activate_object(editor.currentObjectID);
   },
   point_add: function(path_object, x, y) {
     var new_path = path_object.attr("path") + " " + x + " " + y;
@@ -346,7 +438,7 @@
 
     if (typeof nosave == 'undefined') { 
       elements[key] = temp;
-      editor.saveLocal(elements, key);
+   //   editor.saveLocal(elements);
       i++;
     }
   },
@@ -362,11 +454,16 @@
     }
   },
   */
-  saveLocal: function (objects_array, last_title, storage_selector){
-    $("body").data("draw_latest", last_title)
+  saveLocal: function (objects_array){
     // Undo option
     if(typeof localStorage !=="undefined") {
-      localStorage.undo = JSON.stringify($(".draw-input-wrapper textarea").val());
+      var lastIndex = false;
+      for (lastIndex in objects_array);
+
+      var attr = elements[lastIndex];
+      attr.id = lastIndex;
+      localStorage.undo = JSON.stringify(attr);
+
     }
     $(".draw-input-wrapper textarea").val(JSON.stringify(objects_array));
   },
@@ -384,11 +481,12 @@
       canvas_width: 400,
       canvas_height: 640,
       backgrounds: {},
+      background_image: {},
       image_palette: {},
       // Tools regarding the attributes of the drawn object.
       attr_tools: {
         "stroke-dasharray": {
-          " ": image_path + "/pathicon0.png",
+          "none": image_path + "/pathicon0.png",
           "-": image_path + "/pathicon1.png",
           "--": image_path + "/pathicon2.png"
         },
@@ -458,13 +556,14 @@
             }
             else {
               // Other objects.
-              objectsArray[$("body").data("active")].remove();
+              objectsArray[editor.currentObjectID].remove();
             }
             // Delete the data of the object.
-            delete objectsArray[$("body").data("active")];
-            delete elements[$("body").data("active")];
+            delete objectsArray[editor.currentObjectID];
+            delete elements[editor.currentObjectID];
             editor.saveLocal(elements);
-            $("body").data("active", "");
+            editor.currentObjectID = "";
+            bbox.set.hide();
           }
         }
       }
@@ -577,9 +676,13 @@
       }
       $(".draw-background-select").change(function() { editor.setBackground(background_list, $(this).val()) });
     }
+    else if (editor.isset(settings.background_image.src)) {
+      bg = paper.image(settings.background_image.src, 0, 0, settings.background_image.width, settings.background_image.height);
+    }
     else {
+  
       paper.setStart();
-      paper.rect(0,0, settings.canvas_width, settings.canvas_height).attr({"fill": "#fefefe"});
+      paper.rect(0,0, settings.canvas_width, settings.canvas_height).attr({"fill": "#FFF"});
 
       bg = paper.setFinish();
     }
@@ -599,7 +702,7 @@
     if (this.val().length > 2) {
       saved_drawing = JSON.parse($(".draw-diagram-input").val());
       if (typeof saved_drawing.background != "undefined") {
-        editor.setBackground(background_list, saved_drawing.background);
+        editor.setBackground(background_list, saved_drawing.background, true);
         $(".draw-background-select").find("[value='" + saved_drawing.background + "']").attr("selected", "selected");
         delete saved_drawing.background;
       }
@@ -615,7 +718,9 @@
 
     $("body").data("active", "");
   };
+  /*
   $(document).ready(function(){
     $(".draw-diagram-input").raphaelPaper({backgrounds: Drupal.settings.draw_settings.backgrounds });
   });
+*/
 })(jQuery);

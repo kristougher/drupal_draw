@@ -62,62 +62,17 @@ function draw_field_widget_form(&$form, &$form_state, $field, $instance, $langco
   
   $inline_js = 'jQuery(document).ready(function(){ jQuery(".draw-diagram-input").raphaelPaper({backgrounds: Drupal.settings.draw_settings.backgrounds }); });';
 
+  drupal_add_js($inline_js, array('type' => 'inline'));
+
   $element['value']= array(
     '#type' => 'textarea', // hidden',
     '#prefix' => '<span>' . t('Select background') . '</span>'
                . '<select class="draw-background-select" id="draw-background-' . $textarea_id . '"></select>'
                . '<div id="draw-diagram" data-target_element="' . $textarea_id . '" data-image_path="' . $image_path . '"></div>',
-    //           . '<div class="draw-input-wrapper" style="display: none;">',
     '#attributes' => array('class' => array('draw-diagram-input')),
-    //'#suffix' => '</div><div class="draw-view-source">' . t('View source') . '</div>',
-  //  '#disabled' => TRUE,
     '#default_value' => empty($items) ? '' : $items[0]['value'],
   );
   return $element; 
-}
-
-/**
- * Implements hook_field_formatter_view().
- *
- * @todo: We need to provide a formatter for the colors that a user is allowed
- * to enter during node creation.
- */
-function draw_field_formatter_view($object_type, $object, $field, $instance, $langcode, $items, $display) {
-  $element = array();
-  switch ($display['type']) {
-    case 'draw_canvas':
-      foreach ($items as $delta => $item) {
-        $element[$delta]['#type'] = 'markup';
-        $element[$delta]['#markup'] = theme('draw_canvas', array());
-      }
-      break;
-  }
-
-  return $element;
-}
-
-/**
- * Implements hook_theme().
- *
- * This lets us tell Drupal about our theme functions and their arguments.
- */
-function draw_theme($existing, $type, $theme, $path) {
-  return array(
-    'draw_canvas' => array(
-      'variables' => array('color' => NULL),
-    ),
-  );
-}
-/**
- * A custom theme function.
- *
- * By using this function to format our node-specific information, themes
- * can override this presentation if they wish.  This is a simplifed theme
- * function purely for illustrative purposes.
- */
-function theme_draw_canvas($variables) {
-  $output = '<div class="canvas"></div>';
-  return $output;
 }
 
 /**
