@@ -131,12 +131,14 @@
   bbox_create: function() {
     paper.setStart();
     bbox.rect = paper.rect(0,0,1,1).attr({opacity: .3,"stroke-dasharray": "-", opacity: 0.1});
-    bbox.rotate = paper.circle(0,0,3);
+    bbox.rotate = paper.circle(0,0,5).attr({fill: "#efefef"});
     bbox.resize = paper.rect(-15, -15, 15, 15).attr({fill: "#efefef"});
     bbox.set = paper.setFinish();
     bbox.set.hide();
   //  bbox.rect.drag(editor.move, editor.start, editor.up);
     bbox.resize.drag(editor.bbox_resize_move, editor.bbox_resize_start, editor.bbox_resize_end);
+
+    bbox.rotate.drag(editor.bbox_rotate_move, editor.bbox_rotate_start, editor.bbox_rotate_end);
   },
   bbox_hide: function() {
     bbox.rect.hide();
@@ -148,6 +150,7 @@
     bbox.rotate.show();
     bbox.resize.show();
   },
+  // When an object is selected, adjust the settings of the bounding box.
   bbox_enable: function($object) {
 
     bbox.coords = $object.getBBox();
@@ -167,11 +170,14 @@
     };
     var sqx = Math.pow(bbox.drag.x - bbox.drag.x2, 2), sqy = Math.pow(bbox.drag.y - bbox.drag.y2, 2);
     bbox.drag.original_size = Math.sqrt(sqx + sqy);
-    console.log(objectsArray[editor.currentObjectID][0]);
+
     bbox.transform_storage = objectsArray[editor.currentObjectID][0].transform();
 
     editor.bbox_hide();
   },
+  /**
+   * Action when dragging the resize object.
+   */
   bbox_resize_move: function(dx, dy) {
     var newsqx = Math.pow((bbox.drag.x + dx) - bbox.drag.x2, 2);
     var newsqy = Math.pow((bbox.drag.y + dy) - bbox.drag.y2, 2);
@@ -179,6 +185,9 @@
     objectsArray[editor.currentObjectID].transform(bbox.transform_storage + "s" + (bbox.drag.new_size/bbox.drag.original_size));
     bbox.move = {scale: (bbox.drag.new_size/bbox.drag.original_size)};
   },
+  /**
+   * Action when finishing resizing action. 
+   */
   bbox_resize_end: function() {
     objectsArray[editor.currentObjectID].transform(bbox.transform_storage + "s" + bbox.move.scale);
     
@@ -191,21 +200,33 @@
       x: Math.round(bbox.rect.attr("x")),
       y: Math.round(bbox.rect.attr("y")),
       x2: Math.round(bbox.rect.attr("x") + bbox.rect.attr("width")),
-      y2: Math.round(bbox.rect.attr("y") + bbox.rect.attr("height"))
+      y2: Math.round(bbox.rect.attr("y") + bbox.rect.attr("height")),
+
     };
 
+    bbox.transform_storage = objectsArray[editor.currentObjectID][0].transform();
     editor.bbox_hide();
   },
   bbox_rotate_move: function(dx, dy) {
-    var newsqx = Math.pow((bbox.drag.x + dx) - bbox.drag.x2, 2);
-    var newsqy = Math.pow((bbox.drag.y + dy) - bbox.drag.y2, 2);
-    Math.acos();
-    bbox.drag.new_size = Math.sqrt(newsqx + newsqy);
-    objectsArray[editor.currentObjectID].transform(bbox.transform_storage + "s" + (bbox.drag.new_size/bbox.drag.original_size));
-    bbox.move = {scale: (bbox.drag.new_size/bbox.drag.original_size)};
+   
+    var base =  (bbox.drag.x2 + dx) - bbox.drag.x;
+    var c = Math.sqrt(Math.pow(dy, 2) + Math.pow(base, 2));
+    var a = Math.abs(dy);
+
+    var asin =  (a * Math.sin(90))/c; //(((base * base) + (c * c)) - (a * a)) / (base * c * 2);
+
+    var angle = Math.asin(asin);
+
+    if (dy < 0) {
+      angle *= -1;
+    }
+    angle *= 100;
+    console.log(asin + " base: " + base + " a:" + a + " c:" + c +" angle:" + angle);
+    objectsArray[editor.currentObjectID].transform(bbox.transform_storage + "r" + angle);
+    bbox.move = {rotate: angle};
   },
   bbox_rotate_end: function() {
-    objectsArray[editor.currentObjectID].transform(bbox.transform_storage + "s" + bbox.move.scale);
+    objectsArray[editor.currentObjectID].transform(bbox.transform_storage + "r" + bbox.move.rotate);
     
     elements[editor.currentObjectID] = objectsArray[editor.currentObjectID][0].attr();
     editor.saveLocal(elements, editor.currentObjectID);
@@ -499,17 +520,24 @@
     }
 };
 
-  
+  /**
+   * The function initiating the paper.
+   */
   $.fn.raphaelPaper = function(options) {
 
     var image_path = "/" + $("#draw-diagram").data("image_path"); // "../images";
-    console.log(image_path);
     var settings = $.extend({
       canvas_width: 400,
       canvas_height: 640,
       backgrounds: {},
       background_image: {},
-      image_palette: {},
+      image_palette: {
+        polfoto: {
+        url: "http://multimedia.pol.dk/archive/00748/Minister__Udspil_vi_748646p.jpg",
+        width: 120,
+        height: 100
+        }
+      },
       // Tools regarding the attributes of the drawn object.
       attr_tools: {
         "stroke-dasharray": {
@@ -619,10 +647,11 @@
     // Setting up the toolboxes. 
     // First the images to be used.
     $.each(settings.image_palette, function(index, item) {
-      $("#draw-image-palette").append('<div class="draw-clipart" id="draw-' + index + '" style="background-image: ' + item + '"></div>').click(function(){
+      $("#draw-image-palette").append('<div class="draw-clipart draw-tool-icon" id="draw-' + index + '" style="background-image: url(' + item.url + ');"></div>').click(function(){
         objectsArray[index + "_" + i] = paper.image(item.url, (settings.canvas_width / 2), (settings.canvas_height / 2), item.width, item.height);
         objectsArray[index + "_" + i].click(function() {
-        }).drag(move, start, up);
+          editor.activate_object(index + "_" + i);
+        });
       });
     });
 
