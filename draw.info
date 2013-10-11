@@ -1,3 +1,6 @@
 name = Draw
 description = Raphaël implementation to draw diagrams
 core = 7.x
+
+files[] = draw.module
+files[] = draw.install

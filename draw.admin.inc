@@ -1,51 +1,67 @@
 <?php
 /**
+ * @file
+ * Author Kristoffer Arrild Asmussen <k@arrild.com>
+ */
+
+/**
  * Menu callback for configuration page for Draw.
  */
 function draw_admin_form($form, &$form_state) {
-  $admin_form = array();
   $draw_settings = variable_get('draw_settings', array('canvas_width' => 400, 'canvas_height' => 640, 'backgrounds' => array()));
 
-
-
-  $admin_form['basic'] = array(
+  $form['images'] = array(
     '#type' => 'fieldset',
-    '#title' => t('Draw basic settings'),
+    '#title' => t('Available images'),
+    '#collapsible' => TRUE,
+    '#attributes' => array(
+      'class' => array('draw-image-upload-repeat'),
+    ),
+    '#prefix' => '<div id="images-upload-wrapper">',
+    '#suffix' => '</div>',
+    '#description' => t('Add the images you want to allow the user to insert in the diagram.'),
   );
-  $admin_form['basic']['canvas_width'] = array(
-    '#title' => t('Canvas width'),
-    '#type' => 'textfield',
-    '#size' => 5,
-    '#default_value' => $draw_settings['canvas_width'],
-  );
-  $admin_form['basic']['canvas_height'] = array(
-    '#title' => t('Canvas height'),
-    '#type' => 'textfield',
-    '#size' => 5,
-    '#default_value' => $draw_settings['canvas_height'],
-  );
-  $image_path = drupal_get_path('module', 'draw') . '/images';
-  $path = drupal_get_path('module', 'draw') . '/js/';
-  drupal_add_js($path . 'raphael-min.js');
-  drupal_add_js($path . 'draw_fe_render.js');
-  drupal_add_js($path . 'draw_basic.js');  
 
-  foreach ($draw_settings['backgrounds'] as $id => $background) {
-    $admin_form['backgrounds'][$id] = array(
-      '#type' => 'item',
-      '#title' => $background['title'],
-      '#markup' => '<h3><a href="/admin/config/content/drupal_draw/edit_background/' . $id . '">' . t('Edit') . '</a></h3>'
-                 . '<div class="draw-canvas" id="draw-diagram-' . $id .'" data-nid="' . $id .'" data-image_path="' . $image_path . '"></div>',
-    );
-    drupal_add_js(array('draw' => array('drawing-' . $id => $background['content'])), 'setting');
+
+  // Build the fieldset with the proper number of names. We'll use
+  // $form_state['num_names'] to determine the number of textfields to build.
+  if (empty($form_state['num_images'])) {
+    $form_state['num_images'] = empty($draw_settings['images']) ? 1 : count($draw_settings['images']);
   }
 
-  $admin_form['background_new'] = array(
-    '#type' => 'item',
-    '#markup' => '<h3><a href="/admin/config/content/drupal_draw/edit_background/new_background">' . t('Create new background') . '</a></h3>',
+  for ($i = 0; $i < $form_state['num_images']; $i++) {
+    $form['images']['img'][$i] = array(
+      '#type' => 'managed_file',
+      '#title' => t('Available image ' . $i),
+      '#upload_validators'  => array('file_validate_extensions' => array('png gif jpg jpeg')),
+      '#default_value' => empty($draw_settings['images'][$i]) ? NULL : $draw_settings['images'][$i],
+      '#upload_location' => 'public://draw_images/',
+    );
+  }
+
+  $form['images']['add_image'] = array(
+    '#type' => 'submit',
+    '#value' => t('Add one more'),
+    '#submit' => array('draw_add_more_add_one'),
+    '#ajax' => array(
+      'callback' => 'draw_add_more_callback',
+      'wrapper' => 'images-upload-wrapper',
+    ),
   );
 
-  $admin_form['submit'] = array(
+  if ($form_state['num_images'] > 1) {
+    $form['images']['remove_image'] = array(
+      '#type' => 'submit',
+      '#value' => t('Remove one'),
+      '#submit' => array('draw_add_more_remove_one'),
+      '#ajax' => array(
+        'callback' => 'draw_add_more_callback',
+        'wrapper' => 'images-upload-wrapper',
+      ),
+    );
+  }
+
+  $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Save settings'),
   );
@@ -54,13 +70,43 @@ function draw_admin_form($form, &$form_state) {
   $draw_settings['backgrounds'] = array('content' => array());
   drupal_add_js(array('draw_settings' => $draw_settings), 'setting');
 
-  return $admin_form;
+  return $form;
 }
 
+/**
+ * AJAX handler for image upload.
+ */
+function draw_add_more_add_one($form, &$form_state) {
+  $form_state['num_images']++;
+  $form_state['rebuild'] = TRUE;
+}
+
+function draw_add_more_callback($form, $form_state) {
+  return $form['images'];
+}
+
+/**
+ * Submit handler for draw_admin_form.
+ */
 function draw_admin_form_submit($form, &$form_state) {
-  $draw_settings = variable_get('draw_settings', array('canvas_width' => 400, 'canvas_height' => 640, 'backgrounds' => array()));
-  $draw_settings['canvas_width'] = $form_state['values']['canvas_width'];
-  $draw_settings['canvas_height'] = $form_state['values']['canvas_height'];
+  $draw_settings = variable_get('draw_settings', array('backgrounds' => array()));
+
+  
+  // Save images.
+  $draw_settings['images'] = array();
+  for ($i=0; $i < $form_state['num_images']; $i++) {
+    if (empty($form['images']['img'][$i])) {
+      continue;
+    }
+    $form['images']['img'][$i]['#file']->status = 1;
+    $file = file_save($form['images']['img'][$i]['#file']);
+    $draw_settings['images'][] = $file->fid;
+    file_usage_add($file, 'draw', 'file', $file->fid);
+  }
+  
+  foreach ($form_state['values'] as $key => $val) {
+    $draw_settings;
+  }
 
   variable_set('draw_settings', $draw_settings);
 }

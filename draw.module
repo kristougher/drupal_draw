@@ -1,5 +1,10 @@
 <?php
 /**
+ * @file
+ * Author Kristoffer Arrild Asmussen <k@arrild.com>
+ */
+
+/**
  * Implementation of hook_menu.
  */
 function draw_menu() {
@@ -26,14 +31,55 @@ function draw_menu() {
 }
 
 /**
- * Implementation of hook_field_widget_info.
+ * Implements hook_field_info().
+ */
+function draw_field_info() {
+  return array(
+    'draw' => array(
+      'label' => t('Drawing pad'),
+      'description' => t('This field creates a drawing pad.'),
+      'settings' => array('canvas_height' => '450', 'canvas_width' => '450'),
+      'instance_settings' => array('canvas_height' => '450', 'canvas_width' => '450'),
+      'default_widget' => 'drawing_pad',
+      'default_formatter' => 'draw_default',
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_instance_settings_form().
+ */
+function draw_field_instance_settings_form($field, $instance) {
+ $settings = $instance['settings'];
+  $form = array();
+
+  $form['canvas_height'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Drawing height'),
+    '#default_value' => $settings['canvas_height'],
+    '#size' => 4,
+    '#maxlength' => 4,
+  );
+  $form['canvas_width'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Drawing width'),
+    '#default_value' => $settings['canvas_width'],
+    '#size' => 4,
+    '#maxlength' => 4,
+  );
+
+  return $form;
+}
+
+/**
+ * Implements hook_field_widget_info.
  * Make the diagram an option for text_long fields.
  */
-function draw_field_widget_info(){
+function draw_field_widget_info() {
   return array(
-    'diagram' => array(
-      'label' => t('Diagram'),
-      'field types' => array('text_long'),
+    'drawing_pad' => array(
+      'label' => t('Drawing'),
+      'field types' => array('draw'),
       'behaviors' => array(
       'multiple values' => FIELD_BEHAVIOR_DEFAULT, 
       'default value' => FIELD_BEHAVIOR_DEFAULT,
@@ -42,60 +88,117 @@ function draw_field_widget_info(){
     
   );
 }
+
+/**
+ * Implements hook_field_formatter_info().
+ */
+function draw_field_formatter_info() {
+  return array(
+    'draw_default' => array(
+      'label' => t('Default'),
+      'field types' => array('draw'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_formatter_view().
+ */
+function draw_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $element = array();
+  $settings = $display['settings'];
+
+  // Todo (ka): Build more display modes for customized viewing on different platforms.
+  switch ($display['type']) {
+    case 'draw_default':
+      $json_content = array();
+      foreach ($items as $delta => $item) {
+        $element[$delta] = array('#markup' => $item['value_svg']);
+      }
+      break;
+  }
+  return $element;
+}
+
 /** 
  * Implements hook_field_widget_form.
  * Include the needed JS.
  */
 function draw_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
-  $textarea_id = $element['#field_name'] . '[' . $element['#language'] . '][' . $element['#delta'] . '][value]';
-  $image_path = drupal_get_path('module', 'draw') . '/images';
-  $create_image_uri = 'public://drupal_draw/';
-  $path = drupal_get_path('module', 'draw');
-  drupal_add_css($path . '/jquery_draw.css', array('type' => 'file'));
-  drupal_add_js($path . '/js/' . 'raphael-min.js');
-  //drupal_add_js($path . 'editor_base.js');
-  drupal_add_js($path . '/js/' . 'jquery_draw.js');
- // drupal_add_js($path . 'draw_basic.js');
-  $draw_settings = variable_get('draw_settings', array('canvas_width' => 400, 'canvas_height' => 640, 'backgrounds' => array()));
+  // Get the images from the configuration. Todo (ka) this should be done in field instance form.
+  $draw_settings = variable_get('draw_settings', array());
+  $available_images = array();
 
-  drupal_add_js(array('draw_settings' => $draw_settings), 'setting');
+  foreach ($draw_settings['images'] as $fid) {
+    $file = file_load($fid);
+
+    // No image should be larger than the specified canvas
+    $image_info = image_get_info($file->uri);
+    $image_info['src'] = file_create_url($file->uri);
+
+    // Assign a different size if the image is too big.
+    if ($image_info['height'] > $instance['settings']['canvas_height']) {
+      $scale = $instance['settings']['canvas_height'] / $image_info['height'];
+      $image_info['height'] = $instance['settings']['canvas_height'];
+      $image_info['width'] = intval($scale * $instance['settings']['canvas_width']);
+    }
+
+    // If the image is still wider than the canvas, resize again.
+    if ($image_info['width'] > $instance['settings']['canvas_width']) {
+      $scale = $instance['settings']['canvas_width'] / $image_info['width'];
+      $image_info['width'] = $instance['settings']['canvas_width'];
+      $image_info['height'] = intval($scale * $instance['settings']['canvas_height']);
+    }
+
+    $available_images[] = $image_info;
+  }
+
+  $image_path = drupal_get_path('module', 'draw') . '/jqdraw/images';
+  $create_image_uri = 'public://drupal_draw/';
+
+  // Include the required CSS and JS for the editing form.
+  $path = drupal_get_path('module', 'draw');
+  drupal_add_css($path . '/jqdraw/jquery_draw.css', array('type' => 'file'));
+  drupal_add_js($path . '/jqdraw/js/' . 'raphael-min.js');
+  drupal_add_js($path . '/jqdraw/js/' . 'raphael.serialize.js'); 
+  drupal_add_js($path . '/jqdraw/js/' . 'jquery_draw.js');
+ 
+
+  $instance['settings']['image_path'] = '/' . $image_path;
+  $instance['settings']['image_palette'] = $available_images;
+
+  drupal_add_js(array('draw_settings' => $instance['settings']), 'setting');
   
-  $inline_js = 'jQuery(document).ready(function(){ jQuery(".draw-diagram-input").raphaelPaper({backgrounds: Drupal.settings.draw_settings.backgrounds }); });';
+  $inline_js = 'jQuery(document).ready(function(){ jQuery(".draw-diagram-input").raphaelPaper(Drupal.settings.draw_settings); });';
 
   drupal_add_js($inline_js, array('type' => 'inline'));
 
-  $element['value']= array(
-    '#type' => 'textarea', // hidden',
-    '#prefix' => '<span>' . t('Select background') . '</span>'
-               . '<select class="draw-background-select" id="draw-background-' . $textarea_id . '"></select>'
-               . '<div id="draw-diagram" data-target_element="' . $textarea_id . '" data-image_path="' . $image_path . '"></div>',
+  // The field for the JSON values.
+  $element['value'] = array(
+    '#type' => 'textarea',
     '#attributes' => array('class' => array('draw-diagram-input')),
     '#default_value' => empty($items) ? '' : $items[0]['value'],
+  );
+
+  // The field for the SVG.
+  $element['value_svg'] = array(
+    '#type' => 'textarea',
+    '#attributes' => array(
+      'class' => array('draw-diagram-input-svg'),
+      'style' => array('display: none;')
+    ),
+    '#default_value' => empty($items) ? '' : $items[0]['value_svg'],
   );
   return $element; 
 }
 
 /**
- * Implementation of hook_preprocess_field.
- * Creates the drawing in frontend.
+ * Implements hook_field_is_empty().
  */
-function draw_preprocess_field(&$variables) {
-  if ($variables['field_name_css'] == 'field-diagram') {
-    $draw_settings = variable_get('draw_settings', array('canvas_width' => 400, 'canvas_height' => 640, 'backgrounds' => array()));
-    drupal_add_js(array('draw_settings' => $draw_settings), 'setting');
-
-    $nid = $variables['element']['#object']->nid;
-    $image_path = drupal_get_path('module', 'draw') . '/images';
-    $path = drupal_get_path('module', 'draw');
-    drupal_add_js($path . '/js/' . 'raphael-min.js');
-    drupal_add_js($path . '/js/' . 'draw_fe_render.js');
-    drupal_add_js($path . '/js/' . 'draw_basic.js');
-
-
-
-    $json = json_decode($variables['element']['#items'][0]['value'], TRUE);
-    $variables['element']['#items'][0]['value'] = '<div class="canvas"></div>';
-    $variables['items'][0]['#markup'] = '<div class="draw-canvas" id="draw-diagram-' . $nid .'" data-nid="' . $nid .'" data-image_path="' . $image_path . '"></div>';
-    drupal_add_js(array('draw' => array('drawing-' . $nid => $json)), 'setting');
+function draw_field_is_empty($item, $field) {
+  if (empty($item['value']) && (string) $item['value'] !== '0') {
+    return TRUE;
   }
+  return FALSE;
 }
+
