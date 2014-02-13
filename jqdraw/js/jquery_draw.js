@@ -119,21 +119,10 @@
     bbox.resize.drag(editor.bbox_resize_move, editor.bbox_resize_start, editor.bbox_resize_end);
     bbox.rotate.drag(editor.bbox_rotate_move, editor.bbox_rotate_start, editor.bbox_rotate_end);
   },
-  bbox_hide: function() {
- /*   bbox.set.hide();
-    
-    bbox.rect.hide();
-    bbox.rotate.hide();
-    bbox.resize.hide();
-*/
-  },
   bbox_show: function() {
     bbox.set.show();
-    /*
-    bbox.rect.show();
-    bbox.rotate.show();
-    bbox.resize.show();
-    */
+  },
+  bbox_hide: function() {
   },
   // When an object is selected, adjust the settings of the bounding box.
   bbox_enable: function($object) {
@@ -333,7 +322,6 @@
   },
   rectangle_start: function(x, y) {
     var canvas_offset = $("#draw-diagram").offset();
-
     tempObject = paper.rect((x - canvas_offset.left), (y - canvas_offset.top), 5, 5);
     tempObject.attr({title: "rect_" + i}).attr(current_attributes);
     tempObject.key = "rect_" + i;
@@ -445,7 +433,7 @@
       }
     }
     // TODO: Awful conversion of dasharray.
-    if (editor.isset(attr["stroke-dasharray"]) && (attr["stroke-dasharray"].indexOf(","))) {
+    if (editor.isset(attr["stroke-dasharray"]) && (attr["stroke-dasharray"].indexOf(",") > -1)) {
       if (attr["stroke-dasharray"] == "6,2") {
         attr["stroke-dasharray"] = "-";
       }
@@ -466,8 +454,9 @@
     objectsArray[key] = paper.add([attr]);
     objectsArray[key].attr({title: key});
 
-    objectsArray[key].click(function() {
-      editor.activate_object(this.attr("title")) 
+    objectsArray[key].click(function(e) {
+      editor.activate_object(this.attr("title"));
+      e.stopPropagation();
     });
 
     // Interpret the matrix and convert it to a transform string.
@@ -514,7 +503,7 @@
     contents = {};
     var svgdata = [];
     for(var node = paper.bottom; node != null; node = node.next) {
-    if (node && node.type && node.attrs.title != "bbox") {
+    if (node && node.type && (node.attrs.title != "bbox") && (node.attrs.title != "bg")) {
         switch(node.type) {
           case "image":
             var object = {
@@ -617,9 +606,13 @@
 
     // Save the necessary SVG for a simpler display option..
     if ($(".draw-diagram-input-svg").length > 0) {
+      
+
       $(".draw-input-wrapper").append('<div class="raphaelPaper-temp"></div>');
       $(".raphaelPaper-temp").html($("#draw-diagram").html());
-      $(".raphaelPaper-temp [title='bbox']").remove();
+      
+      console.log($(".raphaelPaper-temp title:contains('bbox')"))
+      $(".raphaelPaper-temp title:contains('bbox')").parent().remove();
       $(".raphaelPaper-temp svg").attr("xlink:xmlns", "http://www.w3.org/1999/xlink");
       $(".raphaelPaper-temp svg a > *").appendTo(".raphaelPaper-temp svg");
       
@@ -765,6 +758,16 @@
             editor.saveLocal();
           },
           icon_url: image_path + "/disk.png"
+        },
+        viewObjects: {
+          action: function() {
+            var menu = '';
+            $.each(objectsArray, function(index, content){
+              menu += '<div class="object-menu-line" id="' + index +'">'+index+'</div>';
+            });
+            $("#draw-tools-palette").append('<div class="object-window">'+menu+'</div>');
+          },
+          icon_url: image_path + "/arrow_undo.png"
         }
         /*
         undo: {
@@ -790,10 +793,7 @@
     // Setting up the required markup around the widget.
     this.wrap('<div class="draw-widget-diagram"></div>');
     this.wrap('<div class="draw-input-wrapper"></div>');
-    this.closest(".draw-widget-diagram").prepend('<div class="draw-view-source">View source</div>');
-    this.closest(".draw-widget-diagram").prepend('<div id="draw-tools-palette"></div>');
-    $("#draw-tools-palette").prepend('<div id="draw-image-palette"></div>');
-    this.closest(".draw-widget-diagram").prepend('<div id="draw-diagram"></div>');
+    this.closest(".draw-widget-diagram").prepend('<div id="draw-diagram"></div><div id="draw-tools-palette"><div id="draw-image-palette"></div></div><div class="draw-view-source">View source</div>');
 
     // Toggle source view.
     $(".draw-view-source").click(function(){
@@ -808,23 +808,25 @@
     $.each(settings.image_palette, function(index, item) {
       $("#draw-image-palette").append('<div data-img_id="' + index + '" class="draw-clipart draw-tool-icon" id="draw-' + index + '" style="background-image: url(' + item.src + ');"></div>');
     });
-    $(".draw-clipart").click(function(){
+    $(".draw-clipart").bind("click touchend", function(e){
         // Add the 
         settings.image_palette[$(this).data("img_id")].x = (settings.canvas_width / 2);
         settings.image_palette[$(this).data("img_id")].y = (settings.canvas_height / 2);
 
         editor.addImage(settings.image_palette[$(this).data("img_id")]);
+        e.stopPropagation();
     });
 
     // Drawing tools.
     $("#draw-tools-palette").append('<div class="draw-tool-section draw-tools" data-attr="type"></div>');
     $.each(settings.tools, function(index, item) {
       $(".draw-tools").append('<div class="draw-tool-icon ' + index + '" style="background-image: url(' + item.icon_url + ');">' + index + '</div>');
-      $(".draw-tools ." + index).click(function(){
+      $(".draw-tools ." + index).click(function(e){
         item.action();
         $(this).parent().find(".draw-tool-icon").css("opacity", "0.5");
         $(this).css("opacity", 1);
         clear_element_events(bg);
+        e.stopPropagation();
       });
     });
 
@@ -832,11 +834,12 @@
     $("#draw-tools-palette").append('<div class="draw-tool-section draw-tools-existing" data-attr="type"></div>');
     $.each(settings.onActiveObject, function(index, item) {
       $(".draw-tools-existing").append('<div class="draw-tool-icon ' + index + '" style="background-image: url(' + item.icon_url + ');">' + index + '</div>');
-      $(".draw-tools-existing ." + index).click(function(){
+      $(".draw-tools-existing ." + index).click(function(e){
         if (("undefined" == typeof editor.currentObjectID) || (editor.currentObjectID == "") || !editor.currentObjectID) {
           return false;
         }
         item.action(editor.currentObjectID);
+        e.stopPropagation();
       });
     });
 
@@ -844,8 +847,9 @@
     $("#draw-tools-palette").append('<div class="draw-tool-section draw-tools-general" data-attr="type"></div>');
     $.each(settings.general, function(index, item) {
       $(".draw-tools-general").append('<div class="draw-tool-icon ' + index + '" style="background-image: url(' + item.icon_url + ');">' + index + '</div>');
-      $(".draw-tools-general ." + index).click(function(){
+      $(".draw-tools-general ." + index).click(function(e){
         item.action();
+        e.stopPropagation();
       });
     });
 
@@ -879,7 +883,7 @@
     delete this_section;
     
     // Generic behavior for all attribute tool buttons.
-    $("#draw-tools-palette .draw-tool-icon").bind("click", function(){
+    $("#draw-tools-palette .draw-tool-icon").bind("click", function(e){
       current_attributes[$(this).parent().data("attr")] = $(this).text();
       $(this).siblings().css('opacity', 0.5);
       $(this).css('opacity', 1);
@@ -888,6 +892,7 @@
         objectsArray[editor.currentObjectID].attr($(this).parent().data("attr"), $(this).text());
         elements[editor.currentObjectID] = objectsArray[editor.currentObjectID][0].attr();
       }
+      e.stopPropagation();
     });
 
     /*************************************************
@@ -930,7 +935,7 @@
       paper.rect(0,0, settings.canvas_width, settings.canvas_height).attr({"fill": "#FFF", stroke: "#666", title: "bg"});
       bg = paper.setFinish();
     }
-    bg.click(function(){
+    $("body").on("click touchend", function(){
       if (editor.currentObjectID.length > 0) {
         editor.deactivate_object(editor.currentObjectID);
       }
